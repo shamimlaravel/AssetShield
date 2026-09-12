@@ -1,0 +1,31 @@
+# AssetShield
+
+> AssetShield is a Laravel-native asset protection layer for Vite-powered applications. It keeps server-side source files outside the public web root, serves compiled assets behind opaque signed/expiring URLs, provides registry-only file resolution, optional vendor-safe JS obfuscation, and disables source maps — while preserving standard Laravel Vite behavior. It never claims browser-delivered code can be made impossible to inspect.
+
+## Documentation
+
+- [README](README.md): Primary project documentation and getting started guide
+- [Installation](docs/installation.md): Composer/npm install, plugin wiring, first build
+- [Configuration Reference](docs/configuration.md): Every config key, env var, and default
+- [Usage — Blade & PHP API](docs/usage.md): `@assetShield`, `@assetShieldCss/Js`, `@shieldVite`, `AssetShield::url/script/style`
+- [Vite Integration & Obfuscation](docs/vite.md): `assetShieldVite()` plugin, presets, vendor-chunk rules
+- [Signed URLs](docs/signed-urls.md): HMAC signing, expiration, verification, signer API
+- [Security Model](docs/security.md): Threat model and honest limitations
+- [Production Deployment](docs/deployment.md): Nginx rules, CDN offload, release checklist
+- [Testing](docs/testing.md): Running the PHP (Pest/PHPUnit + Testbench) and Node (Vitest) suites
+- [Troubleshooting](docs/troubleshooting.md): Common failures, `asset-shield:doctor` interpretation
+
+## Specifications
+
+- [PRD — Product Requirements Document](PRD.md): Product scope, FR/NFR requirements, definition of done
+- [TRD — Technical Requirements & Design](TRD.md): Architecture, component map, dependency graph, signing/ID schemes, test plan
+
+## Project Files
+
+- [Landing Page](index.html): Self-contained marketing/documentation site (dark security/terminal design)
+- [Changelog](CHANGELOG.md): Version history (0.1.0 MVP)
+- [License](LICENSE): MIT
+
+## Optional
+
+- [Docs Index](docs/index.md): Documentation map and orientation

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AssetShield — Laravel-native asset protection for Vite apps</title>
+<meta name="description" content="Laravel-native asset protection for Vite-powered applications. Opaque, signed, expiring asset URLs. Source maps off. Vendor-safe obfuscation. Honest about what it cannot do.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Michroma&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#060d0a;
+    --bg-2:#08110d;
+    --bg-3:#0b1712;
+    --surface:#0d1a15;
+    --surface-2:#102017;
+    --line:rgba(140,224,181,.13);
+    --line-strong:rgba(140,224,181,.26);
+    --text:#d9f2e7;
+    --muted:#7fa694;
+    --faint:#557064;
+    --accent:#3aff9e;
+    --accent-dim:rgba(58,255,158,.16);
+    --accent-2:#5fe4ff;
+    --warn:#ffb454;
+    --danger:#ff5d6c;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --display:"Michroma",var(--sans);
+    --pad:clamp(1.25rem,4vw,3.5rem);
+    --radius:10px;
+    --shadow:0 24px 70px -30px rgba(0,0,0,.85);
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    background-image:
+      linear-gradient(rgba(58,255,158,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(58,255,158,.035) 1px,transparent 1px);
+    background-size:56px 56px;
+  }
+  ::selection{background:var(--accent);color:#04120a}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:#163c2a;border:3px solid var(--bg);border-radius:8px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:#9dffce}
+  :focus-visible{outline:2px solid var(--accent-2);outline-offset:3px;border-radius:2px}
+  .wrap{max-width:1180px;margin:0 auto;padding-inline:var(--pad)}
+
+  /* ---------- helpers ---------- */
+  .mono{font-family:var(--mono)}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--accent);
+    display:inline-flex;align-items:center;gap:.6rem;
+  }
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--accent)}
+  h1,h2,h3{font-family:var(--display);line-height:1.08;font-weight:400;letter-spacing:.01em}
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    html{scroll-behavior:auto}
+    .reveal{opacity:1;transform:none}
+  }
+
+  /* ---------- header ---------- */
+  .site-header{
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:blur(14px);
+    background:rgba(6,13,10,.78);
+    border-bottom:1px solid var(--line);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-block:.9rem}
+  .brand{display:flex;align-items:center;gap:.8rem;font-family:var(--display);font-size:.95rem;letter-spacing:.08em;color:var(--text)}
+  .brand svg{width:28px;height:28px;flex:none}
+  .nav-links{display:flex;gap:1.7rem;align-items:center}
+  .nav-links a{font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+  .nav-links a:hover{color:var(--text)}
+  .nav-cta{
+    font-family:var(--mono);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;
+    border:1px solid var(--line-strong);border-radius:6px;padding:.5rem .95rem;color:var(--text);
+    transition:.2s;
+  }
+  .nav-cta:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 24px -8px var(--accent)}
+  .version-pill{
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);border:1px solid var(--accent-dim);background:var(--accent-dim);
+    border-radius:999px;padding:.28rem .7rem;white-space:nowrap;
+  }
+  @media (max-width:820px){.nav-links{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;padding:clamp(4rem,10vw,7.5rem) 0 clamp(3rem,7vw,5rem)}
+  .hero::before{
+    content:"";position:absolute;inset:-10% -20% auto;height:120%;
+    background:
+      radial-gradient(52% 42% at 22% 8%,rgba(58,255,158,.10),transparent 62%),
+      radial-gradient(46% 40% at 82% 4%,rgba(95,228,255,.07),transparent 60%);
+    pointer-events:none;z-index:0;
+  }
+  .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(2rem,5vw,4.5rem);align-items:center}
+  .hero h1{font-size:clamp(2rem,4.6vw,3.5rem);margin:1.4rem 0 1.2rem}
+  .hero h1 .accent{color:var(--accent)}
+  .hero p.lede{color:var(--muted);font-size:1.06rem;max-width:34rem}
+  .hero-ctas{display:flex;gap:1rem;flex-wrap:wrap;margin-top:2.2rem}
+  .btn{
+    font-family:var(--mono);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;
+    border-radius:6px;padding:.8rem 1.4rem;transition:.2s;display:inline-flex;align-items:center;gap:.55rem;
+  }
+  .btn-primary{background:var(--accent);color:#04120a;border:1px solid var(--accent)}
+  .btn-primary:hover{background:#8dffc7;box-shadow:0 0 34px -6px var(--accent)}
+  .btn-ghost{border:1px solid var(--line-strong);color:var(--text)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .hero-ticks{display:flex;flex-wrap:wrap;gap:.6rem 1.5rem;margin-top:2rem;color:var(--muted);font-size:.8rem;font-family:var(--mono)}
+  .hero-ticks span{display:inline-flex;align-items:center;gap:.4rem}
+  .hero-ticks svg{width:13px;height:13px}
+
+  /* ---------- terminal ---------- */
+  .terminal{
+    background:#050a08;
+    border:1px solid var(--line-strong);border-radius:12px;
+    box-shadow:var(--shadow),0 0 0 1px rgba(0,0,0,.4);
+    font-family:var(--mono);font-size:.8rem;line-height:1.75;
+    overflow:hidden;
+  }
+  .terminal-bar{display:flex;align-items:center;gap:.5rem;padding:.7rem 1rem;border-bottom:1px solid var(--line);background:var(--surface-2)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.r{background:#ff5d5d}.dot.y{background:var(--warn)}.dot.g{background:var(--accent)}
+  .terminal-title{margin-left:.4rem;color:var(--faint);font-size:.72rem;letter-spacing:.06em;flex:1}
+  .terminal-badge{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;color:var(--accent-2);border:1px solid rgba(95,228,255,.25);border-radius:999px;padding:.15rem .55rem}
+  .terminal-body{padding:1.1rem 1.2rem 1.3rem;min-height:290px;position:relative}
+  .terminal-body::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;
+    background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.14) 4px);
+  }
+  .t-ln{white-space:pre-wrap;color:var(--muted)}
+  .t-prompt{color:var(--accent)}
+  .t-ok{color:var(--accent)}
+  .t-ok-cyan{color:var(--accent-2)}
+  .t-warn{color:var(--warn)}
+  .t-dim{color:var(--faint)}
+  .t-err{color:var(--danger)}
+  .t-strong{color:var(--text)}
+  .caret{display:inline-block;width:.6em;height:1.1em;background:var(--accent);vertical-align:text-bottom;animation:blink 1s steps(1) infinite;margin-left:.2em}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ---------- stat strip ---------- */
+  .stats{border-block:1px solid var(--line);background:linear-gradient(180deg,rgba(11,23,18,.6),rgba(6,13,10,.2))}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+  .stat{background:var(--bg);padding:2rem 1.5rem;text-align:left}
+  .stat b{font-family:var(--display);font-weight:400;font-size:clamp(1.4rem,2.6vw,2.1rem);color:var(--text);display:block;letter-spacing:.02em}
+  .stat b em{font-style:normal;color:var(--accent)}
+  .stat span{font-family:var(--mono);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);display:block;margin-top:.5rem}
+  @media (max-width:820px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---------- sections ---------- */
+  section{padding:clamp(3.5rem,8vw,6.5rem) 0;position:relative}
+  .sec-head{max-width:44rem;margin-bottom:clamp(2.2rem,5vw,3.5rem)}
+  .sec-head h2{font-size:clamp(1.5rem,3vw,2.3rem);margin-top:1rem}
+  .sec-head p{color:var(--muted);margin-top:.9rem;max-width:40rem}
+
+  /* ---------- truth band ---------- */
+  .truth{border-block:1px solid var(--line)}
+  .truth .wrap{display:grid;grid-template-columns:auto 1fr;gap:2rem;align-items:center}
+  .truth-stamp{
+    flex:none;width:64px;height:64px;border:1px solid var(--warn);border-radius:10px;
+    display:grid;place-items:center;color:var(--warn);
+  }
+  .truth h2{font-size:clamp(1.35rem,2.8vw,2rem);max-width:22em}
+  .truth h2 span{color:var(--muted)}
+  .truth .honest{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--warn);margin-bottom:1rem}
+  @media (max-width:820px){.truth .wrap{grid-template-columns:1fr}.truth-stamp{width:52px;height:52px}}
+
+  /* ---------- bento features ---------- */
+  .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:1.1rem}
+  .card{
+    position:relative;grid-column:span 2;
+    background:linear-gradient(180deg,var(--surface),rgba(13,26,21,.4));
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:1.7rem;overflow:hidden;
+    transition:border-color .25s,transform .25s;
+  }
+  .card:hover{border-color:var(--line-strong);transform:translateY(-3px)}
+  .card::after{
+    content:"";position:absolute;top:20px;right:20px;width:14px;height:14px;
+    border-top:1px solid var(--line-strong);border-right:1px solid var(--line-strong);opacity:.7;
+  }
+  .card.wide{grid-column:span 4}
+  .card .k{font-family:var(--mono);font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
+  .card h3{font-family:var(--display);font-size:1.02rem;margin:.8rem 0 .6rem;font-weight:400}
+  .card p{color:var(--muted);font-size:.88rem}
+  .code{
+    font-family:var(--mono);font-size:.74rem;background:#050a08;border:1px solid var(--line);
+    border-left:2px solid var(--accent);border-radius:6px;padding:.7rem .9rem;margin-top:1rem;
+    color:var(--text);overflow-x:auto;line-height:1.7;
+  }
+  .code .d{color:var(--faint)} .code .g{color:var(--accent)} .code .y{color:var(--warn)} .code .c{color:var(--accent-2)}
+  .code .strike{text-decoration:line-through;text-decoration-color:var(--danger);color:var(--faint)}
+  .chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:1rem}
+  .chip{font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;border:1px solid var(--line-strong);border-radius:999px;padding:.3rem .7rem;color:var(--muted)}
+  .chip.on{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-dim)}
+  .ticklist{list-style:none;margin-top:1rem;display:grid;gap:.4rem}
+  .ticklist li{display:flex;gap:.6rem;align-items:baseline;font-size:.85rem;color:var(--muted);font-family:var(--mono)}
+  .ticklist svg{width:12px;height:12px;flex:none;position:relative;top:2px}
+  @media (max-width:900px){.card,.card.wide{grid-column:span 6}}
+
+  /* ---------- pipeline ---------- */
+  .pipeline{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;align-items:stretch}
+  .pipe{
+    border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+    padding:1.6rem;position:relative;
+  }
+  .pipe>svg{width:26px;height:26px;color:var(--accent)}
+  .pipe .n{position:absolute;top:1.2rem;right:1.3rem;font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+  .pipe h3{font-family:var(--display);font-size:1rem;margin:.9rem 0 .5rem;font-weight:400}
+  .pipe p{color:var(--muted);font-size:.85rem}
+  .pipe ul{margin-top:.8rem;list-style:none;display:grid;gap:.3rem}
+  .pipe li{font-family:var(--mono);font-size:.7rem;color:var(--muted);display:flex;gap:.5rem;align-items:baseline}
+  .pipe li svg{width:10px;height:10px;flex:none;position:relative;top:1px}
+  .pipe-arrow{display:none}
+  .driver-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem;align-items:center}
+  @media (max-width:900px){.pipeline{grid-template-columns:1fr}}
+  .flow-note{text-align:center;color:var(--faint);font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;margin-top:1.4rem}
+  .flow-note b{color:var(--accent);letter-spacing:.06em}
+
+  /* ---------- commands ---------- */
+  .cmd-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(2rem,5vw,4rem);align-items:center}
+  .cmd-list{display:grid;gap:.8rem}
+  .cmd{
+    display:grid;grid-template-columns:auto 1fr;gap:1.1rem;align-items:baseline;
+    border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:1rem 1.2rem;
+  }
+  .cmd b{font-family:var(--mono);font-weight:500;color:var(--text)}
+  .cmd b .g{color:var(--accent)}
+  .cmd p{color:var(--muted);font-size:.84rem;margin-top:.3rem}
+  .cmd .num{font-family:var(--mono);color:var(--faint);font-size:.72rem}
+  @media (max-width:900px){.cmd-grid{grid-template-columns:1fr}}
+
+  /* ---------- doctor output ---------- */
+  .doctor .t-ln{display:flex;align-items:baseline;gap:.6rem}
+
+  /* ---------- cta ---------- */
+  .cta{border-top:1px solid var(--line);text-align:center}
+  .cta .wrap{max-width:52rem}
+  .cta h2{font-size:clamp(1.6rem,3.6vw,2.6rem)}
+  .cta p{color:var(--muted);margin:1.1rem auto 0;max-width:34rem}
+  .cta .hero-ctas{justify-content:center}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);padding:3.5rem 0 2.5rem;background:linear-gradient(180deg,transparent,rgba(9,18,14,.8))}
+  .foot{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:2.5rem}
+  .foot h4{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:1rem}
+  .foot ul{list-style:none;display:grid;gap:.5rem}
+  .foot a{font-size:.84rem;color:var(--muted)}
+  .foot a:hover{color:var(--text)}
+  .foot .brand-desc{color:var(--muted);font-size:.85rem;max-width:22rem}
+  .foot-bottom{margin-top:3rem;padding-top:1.6rem;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem 2rem;justify-content:space-between;align-items:center}
+  .foot-bottom p{color:var(--faint);font-size:.76rem;font-family:var(--mono)}
+  .honest-mini{max-width:34rem;font-size:.78rem;color:var(--faint);line-height:1.7}
+  @media (max-width:900px){.foot{grid-template-columns:1fr 1fr}}
+
+  @media (max-width:900px){
+    .hero-grid{grid-template-columns:1fr}
+    .terminal{margin-top:1rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="AssetShield home">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 2.5 27 7v8.2c0 6.9-4.6 11.6-11 14.3C9.6 26.8 5 22.1 5 15.2V7l11-4.5Z" stroke="#3aff9e" stroke-width="1.6"/>
+        <path d="m10.5 15.8 3.4 3.4 7.6-8" stroke="#5fe4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      AssetShield
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#security">Security</a>
+      <a href="#commands">Commands</a>
+      <a href="#docs">Docs</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:.9rem">
+      <span class="version-pill">v0.1.0 MVP</span>
+      <a class="nav-cta" href="#install">Install</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow reveal">Laravel 13 · Vite 5 · PHP 8.3</span>
+        <h1 class="reveal">Compiled assets, <span class="accent">protected</span> at the edge.</h1>
+        <p class="lede reveal">
+          AssetShield is a Laravel-native asset protection layer for Vite-powered applications.
+          Opaque URLs. Signed, expiring links. Source code that stays outside the web root.
+          Reverse-engineering that gets measurable harder.
+        </p>
+        <div class="hero-ctas reveal">
+          <a class="btn btn-primary" href="#install">Get started</a>
+          <a class="btn btn-ghost" href="#security">Read the security model</a>
+        </div>
+        <div class="hero-ticks reveal">
+          <span><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8" stroke-linecap="round"/></svg>Opaque asset URLs</span>
+          <span><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8" stroke-linecap="round"/></svg>HMAC signed links</span>
+          <span><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8" stroke-linecap="round"/></svg>Source maps off</span>
+        </div>
+      </div>
+
+      <div class="terminal reveal" role="img" aria-label="AssetShield terminal session showing installation and secured asset requests">
+        <div class="terminal-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="terminal-title">asset-shield · production</span>
+          <span class="terminal-badge">LIVE</span>
+        </div>
+        <div class="terminal-body" id="term-body">
+          <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">composer require vendor/asset-shield</span></div>
+          <div class="t-ln t-ok" data-ty="1">✔ package installed — provider discovered</div>
+          <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm run build && php artisan asset-shield:build</span></div>
+          <div class="t-ln t-ok" data-ty="2">✔ vite build ok · registry written · 12 assets</div>
+          <div class="t-ln">&#160;</div>
+          <div class="t-ln"><span class="t-strong">GET</span> <span class="t-ok-cyan">/assets/7f92a8c1</span> <span class="t-dim">?expires=1790000000&amp;signature=…</span></div>
+          <div class="t-ln t-ok" data-ty="3">→ 200 text/javascript · immutable · nosniff</div>
+          <div class="t-ln"><span class="t-strong">GET</span> <span class="t-ok-cyan">/assets?file=../../.env</span></div>
+          <div class="t-ln t-err" data-ty="4">→ 403 — arbitrary paths do not exist here</div>
+          <div class="t-ln">&#160;</div>
+          <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">php artisan asset-shield:doctor</span></div>
+          <div class="t-ln t-ok" data-ty="5">✔ Production env · ✔ APP_DEBUG=false · ✔ Registry valid</div>
+          <div class="t-ln" data-ty="6"><span class="t-prompt">$</span><span class="caret" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STATS ============ -->
+  <section class="stats" style="padding:0">
+    <div class="wrap stats-grid">
+      <div class="stat"><b><em>31,536,000</em>s</b><span>Immutable cache max-age</span></div>
+      <div class="stat"><b><em>403</em></b><span>Forged or expired signatures</span></div>
+      <div class="stat"><b><em>2</em></b><span>Delivery drivers in MVP</span></div>
+      <div class="stat"><b><em>0</em></b><span>Sensitive files exposed</span></div>
+    </div>
+  </section>
+
+  <!-- ============ TRUTH ============ -->
+  <section class="truth">
+    <div class="wrap">
+      <div class="truth-stamp" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 3 20 6v5.5C20 16 16.5 19.5 12 21 7.5 19.5 4 16 4 11.5V6l8-3Z" stroke="currentColor" stroke-width="1.4"/><path d="m8.6 11.8 2.4 2.4 4.4-5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <p class="honest reveal">Unobfuscated truth — no security theater</p>
+        <h2 class="reveal">AssetShield does not make browser-delivered code impossible to inspect.
+          <span>It reduces exposure, protects asset access, and increases the cost of reverse engineering.</span></h2>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Capabilities</span>
+        <h2>What a protected build looks like</h2>
+        <p>Everything an asset request touches — the URL, the signature, the resolution, and the wire
+          headers — is hardened by default. No database, no per-request scans.</p>
+      </div>
+
+      <div class="bento">
+        <div class="card wide reveal">
+          <span class="k">01 · URL abstraction</span>
+          <h3>Opaque, key-derived identifiers</h3>
+          <p>Clients see a cipher-like id — never the real build filename. IDs are HMAC-derived from
+            your application key: deterministic per build, non-sequential, and regenerated whenever
+            the key rotates.</p>
+          <div class="code"><span class="d">Blade</span>&nbsp;&nbsp;{!! AssetShield::script(<span class="g">'resources/js/app.js'</span>) !!}
+<span class="d">before</span>&nbsp;&nbsp;/build/assets/app-<span class="strike">A91Kx.js</span>
+<span class="d">after</span>&nbsp;&nbsp;<span class="c">/assets/7f92a8c1</span></div>
+        </div>
+
+        <div class="card reveal">
+          <span class="k">02 · Access control</span>
+          <h3>Signed, expiring URLs</h3>
+          <p>HMAC-SHA256 signatures with constant-time verification. Forged or expired links return
+            HTTP 403.</p>
+          <div class="code"><span class="c">/assets/7f92a8c1</span>
+?expires=<span class="y">1790000000</span>
+&amp;signature=<span class="g">ac42b8…</span></div>
+        </div>
+
+        <div class="card reveal">
+          <span class="k">03 · Resolution</span>
+          <h3>Registry-only lookup</h3>
+          <p>IDs resolve exclusively through a generated registry. Traversal, absolute paths, and
+            query-as-path are structurally impossible.</p>
+          <div class="code"><span class="d">GET</span> /assets?file=../../.env
+<span class="t-err mono">→ 403</span></div>
+        </div>
+
+        <div class="card reveal">
+          <span class="k">04 · Source discipline</span>
+          <h3>Outside the web root</h3>
+          <p>Resources, app, routes, vendor, node_modules, and .env never meet the public surface.</p>
+          <ul class="ticklist">
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8" stroke-linecap="round"/></svg>resources/ · app/ · routes/</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8" stroke-linecap="round"/></svg>vendor/ · storage/ · node_modules/</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8" stroke-linecap="round"/></svg>.env — never retrievable</li>
+          </ul>
+        </div>
+
+        <div class="card reveal">
+          <span class="k">05 · Wire behavior</span>
+          <h3>Immutable caching, safe headers</h3>
+          <p>Long-lived cache keys that CDNs can hold for a year — without breaking signature policy.</p>
+          <div class="code"><span class="d">Cache-Control</span>
+public, max-age=<span class="g">31536000</span>, immutable
+<span class="d">X-Content-Type-Options</span>: nosniff</div>
+        </div>
+
+        <div class="card wide reveal">
+          <span class="k">06 · Build pipeline</span>
+          <h3>Obfuscation, opt-in and vendor-safe</h3>
+          <p>An adapter wraps <span class="mono">javascript-obfuscator</span>. Off by default; presets
+            from light to aggressive; vendor chunks skip by default; CSS is never touched.</p>
+          <div class="chips">
+            <span class="chip on">light</span>
+            <span class="chip on">balanced</span>
+            <span class="chip on">aggressive</span>
+            <span class="chip">vendor: skipped</span>
+            <span class="chip">dynamic imports: kept</span>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <span class="k">07 · Maps</span>
+          <h3>Source maps off</h3>
+          <p>No <span class="mono">.map</span> files ship for protected assets — and enabling them
+            triggers a loud warning.</p>
+          <div class="code"><span class="d">get</span> /assets/<span class="g">*</span>.map
+<span class="t-err mono">→ 404 denied</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PIPELINE ============ -->
+  <section id="pipeline">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Architecture</span>
+        <h2>One build. One registry. Two safe halves.</h2>
+        <p>The Vite plugin produces the registry as a build artifact; the Laravel package consumes it,
+          cached and OPcache-friendly. No database, no per-request filesystem scanning.</p>
+      </div>
+
+      <div class="pipeline">
+        <div class="pipe reveal">
+          <span class="n">01</span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8l-3 4 3 4M17 8l3 4-3 4M13 5l-2 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <h3>Vite build</h3>
+          <p>The plugin runs only on <span class="mono">vite build</span>. Your chunking, hashing, and
+            dynamic imports stay exactly as Vite made them.</p>
+          <ul>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>manifest.json</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>optional JS obfuscation</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>CSS never obfuscated</li>
+          </ul>
+        </div>
+
+        <div class="pipe reveal">
+          <span class="n">02</span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.8 12 4l8 3.8v8.4L12 20l-8-3.8V7.8Z" stroke="currentColor" stroke-width="1.4"/><path d="M12 4v8m0 0v8m0-8H4.5M12 12h7.5" stroke="currentColor" stroke-width="1.2" opacity=".6"/></svg>
+          <h3>Registry artifact</h3>
+          <p>A single JSON file maps logical entries to compiled files to opaque IDs. Server-side only;
+            the browser never sees the compiled paths.</p>
+          <ul>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>logical &#8594; compiled &#8594; opaque</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>written by plugin or <span class="mono">asset-shield:build</span></li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>cached in production</li>
+          </ul>
+        </div>
+
+        <div class="pipe reveal">
+          <span class="n">03</span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12h5m10 0h5M12 2v5m0 10v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 12h5m6 0h5m-3.5-4.5L7.5 16.5m9 0L7.5 7.5" stroke="currentColor" stroke-width="1.2" opacity=".5"/></svg>
+          <h3>Delivery layer</h3>
+          <p>The controller verifies signatures, resolves through the registry, and hands bytes to a
+            driver. Future-proofed for edge offload.</p>
+          <div class="driver-row">
+            <span class="chip on">PublicFileDriver</span>
+            <span class="chip on">StreamDriver</span>
+            <span class="chip">X-Accel-Redirect</span>
+            <span class="chip">X-Sendfile</span>
+            <span class="chip">S3</span>
+            <span class="chip">R2</span>
+            <span class="chip">CDN</span>
+          </div>
+        </div>
+      </div>
+      <p class="flow-note reveal">Artifacts in transit: <b>public/build/manifest.json</b> · <b>storage/asset-shield/registry.json</b></p>
+    </div>
+  </section>
+
+  <!-- ============ SECURITY ============ -->
+  <section id="security">
+    <div class="wrap">
+      <div class="cmd-grid">
+        <div class="terminal reveal">
+          <div class="terminal-bar">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="terminal-title">asset-shield:doctor · http probe</span>
+          </div>
+          <div class="terminal-body" style="min-height:0">
+            <div class="t-ln doctor"><span class="t-prompt">$</span><span class="t-strong">php artisan asset-shield:doctor</span></div>
+            <div class="t-ln doctor t-ok"><span>✔</span> Production environment</div>
+            <div class="t-ln doctor t-ok"><span>✔</span> APP_DEBUG=false</div>
+            <div class="t-ln doctor t-ok"><span>✔</span> Vite manifest found</div>
+            <div class="t-ln doctor t-ok"><span>✔</span> Source maps disabled</div>
+            <div class="t-ln doctor t-ok"><span>✔</span> Registry valid — 12 assets</div>
+            <div class="t-ln doctor t-ok"><span>✔</span> node_modules outside public root</div>
+            <div class="t-ln" aria-hidden="true">&#160;</div>
+            <div class="t-ln doctor t-err"><span>✘</span> /assets/.git  &#8594; <span class="t-strong">403 denied</span></div>
+            <div class="t-ln doctor t-err"><span>✘</span> /assets?file=../../.env &#8594; <span class="t-strong">403 denied</span></div>
+            <div class="t-ln doctor t-err"><span>✘</span> forged signature &#8594; <span class="t-strong">403 denied</span></div>
+          </div>
+        </div>
+        <div>
+          <span class="eyebrow reveal">Threat model</span>
+          <h2 class="reveal" style="font-size:clamp(1.5rem,3vw,2.3rem);margin-top:1rem">Audited by attack, not by claim.</h2>
+          <p class="reveal" style="color:var(--muted);margin-top:1rem;max-width:26rem">
+            Every input is treated as untrusted. The route accepts only opaque IDs; the registry is the
+            only channel to a file; signatures are verified in constant time; and the honest limits are
+            documented, not hidden.
+          </p>
+          <ul class="ticklist reveal" style="margin-top:1.4rem">
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>Path traversal &#8594; structurally impossible</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>.env · PHP · vendor &#8594; never deliverable</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>Forged / expired signature &#8594; 403, constant-time</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>Secrets &#8594; never in HTML, JS, logs, or errors</li>
+            <li><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7.5 5.2 11 12 3.5" stroke="#3aff9e" stroke-width="1.8"/></svg>Source maps &#8594; never shipped for protected assets</li>
+          </ul>
+          <a class="btn btn-ghost reveal" style="margin-top:1.8rem" href="#docs">Read the full security model</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMMANDS ============ -->
+  <section id="commands">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Artisan</span>
+        <h2>Diagnostics that tell the truth</h2>
+        <p>Four commands keep a deploy honest — from first publish to pre-flight health check.</p>
+      </div>
+      <div class="cmd-grid">
+        <div class="cmd-list">
+          <div class="cmd reveal">
+            <span class="num">01</span>
+            <div><b><span class="g">asset-shield:install</span></b>
+              <p>Publishes config, creates the registry path, prints the Vite wiring. Never overwrites your files without asking.</p></div>
+          </div>
+          <div class="cmd reveal">
+            <span class="num">02</span>
+            <div><b><span class="g">asset-shield:build</span></b>
+              <p>Verifies Vite and the manifest, then regenerates and validates the registry. Build errors are loud, never silent.</p></div>
+          </div>
+          <div class="cmd reveal">
+            <span class="num">03</span>
+            <div><b><span class="g">asset-shield:status</span></b>
+              <p>Snapshots the configuration — mode, manifest, registry, signatures, obfuscation, source maps.</p></div>
+          </div>
+          <div class="cmd reveal">
+            <span class="num">04</span>
+            <div><b><span class="g">asset-shield:doctor</span></b>
+              <p>Inspects APP_ENV, debug flags, manifest, maps, node_modules, .env placement, Debugbar, and registry validity. Actionable warnings.</p></div>
+          </div>
+        </div>
+
+        <div class="terminal reveal">
+          <div class="terminal-bar">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="terminal-title">asset-shield:status</span>
+          </div>
+          <div class="terminal-body" style="min-height:0">
+            <div class="t-ln t-strong">AssetShield</div>
+            <div class="t-ln"><span class="t-dim">-----------</span></div>
+            <div class="t-ln doctor"><span class="t-dim">Enabled:</span> <span class="t-ok">yes</span></div>
+            <div class="t-ln doctor"><span class="t-dim">Mode:</span> protected</div>
+            <div class="t-ln doctor"><span class="t-dim">Manifest:</span> <span class="t-ok">found</span></div>
+            <div class="t-ln doctor"><span class="t-dim">Registry:</span> <span class="t-ok">valid</span></div>
+            <div class="t-ln doctor"><span class="t-dim">Signed URLs:</span> enabled</div>
+            <div class="t-ln doctor"><span class="t-dim">Expiration:</span> <span class="t-ok-cyan">300s</span></div>
+            <div class="t-ln doctor"><span class="t-dim">Obfuscation:</span> disabled</div>
+            <div class="t-ln doctor"><span class="t-dim">Source Maps:</span> disabled</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DOCS / INSTALL ============ -->
+  <section id="docs">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Install &amp; docs</span>
+        <h2>Ship a build. Protect it. In four lines.</h2>
+      </div>
+      <div class="cmd-grid">
+        <div class="terminal reveal">
+          <div class="terminal-bar">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="terminal-title">quickstart</span>
+          </div>
+          <div class="terminal-body" style="min-height:0">
+            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">composer require vendor/asset-shield</span></div>
+            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm i -D @vendor/asset-shield</span></div>
+            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">php artisan asset-shield:install</span></div>
+            <div class="t-ln">&#160;</div>
+            <div class="t-ln t-dim">// vite.config.js</div>
+            <div class="t-ln">import { <span class="t-ok">assetShieldVite</span> } from <span class="t-ok-cyan">'@vendor/asset-shield'</span>;</div>
+            <div class="t-ln">plugins: [ laravel({<span class="t-dim"> input: […], refresh: true</span> }), <span class="t-ok">assetShieldVite()</span> ]</div>
+            <div class="t-ln">&#160;</div>
+            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm run build && php artisan asset-shield:build</span></div>
+            <div class="t-ln t-ok">✔ protected build ready</div>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-family:var(--display);font-weight:400;font-size:1.15rem;margin-bottom:1.4rem">Documentation</h3>
+          <div class="cmd-list" style="gap:.6rem">
+            <a class="cmd" href="README.md" style="grid-template-columns:auto 1fr;text-decoration:none">
+              <span class="num">R</span>
+              <div><b>README</b><p>The full package overview and quick start.</p></div>
+            </a>
+            <a class="cmd" href="docs/installation.md" style="grid-template-columns:auto 1fr;text-decoration:none">
+              <span class="num">05</span>
+              <div><b>Installation guide</b><p>Composer + npm, provider discovery, first build.</p></div>
+            </a>
+            <a class="cmd" href="docs/configuration.md" style="grid-template-columns:auto 1fr;text-decoration:none">
+              <span class="num">06</span>
+              <div><b>Configuration reference</b><p>Every key, env var, and its default.</p></div>
+            </a>
+            <a class="cmd" href="docs/security.md" style="grid-template-columns:auto 1fr;text-decoration:none">
+              <span class="num">07</span>
+              <div><b>Security model</b><p>Threat model and the honest limits.</p></div>
+            </a>
+            <a class="cmd" href="docs/deployment.md" style="grid-template-columns:auto 1fr;text-decoration:none">
+              <span class="num">08</span>
+              <div><b>Production deployment</b><p>Nginx rules, CDN offload, release checklist.</p></div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="cta" id="install">
+    <div class="wrap">
+      <span class="eyebrow reveal">Now</span>
+      <h2 class="reveal" style="margin-top:1.1rem">Protect the build you already ship.</h2>
+      <p class="reveal">Opaque URLs, signed links, honest obfuscation, and a doctor that tells you the
+        truth before every deploy — compatible with the Vite pipeline you already use.</p>
+      <div class="hero-ctas reveal">
+        <a class="btn btn-primary" href="#docs">Read the docs</a>
+        <a class="btn btn-ghost" href="#">View on GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="#top" style="margin-bottom:1.1rem">
+          <svg viewBox="0 0 32 32" fill="none" width="24" height="24" aria-hidden="true">
+            <path d="M16 2.5 27 7v8.2c0 6.9-4.6 11.6-11 14.3C9.6 26.8 5 22.1 5 15.2V7l11-4.5Z" stroke="#3aff9e" stroke-width="1.6"/>
+            <path d="m10.5 15.8 3.4 3.4 7.6-8" stroke="#5fe4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          AssetShield
+        </a>
+        <p class="brand-desc">Laravel-native asset protection for Vite-powered applications. Opaque,
+          signed, expiring asset URLs with sources kept outside the web root.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pipeline">Architecture</a></li>
+          <li><a href="#security">Security</a></li>
+          <li><a href="#commands">Commands</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Docs</h4>
+        <ul>
+          <li><a href="README.md">README</a></li>
+          <li><a href="docs/installation.md">Installation</a></li>
+          <li><a href="docs/configuration.md">Configuration</a></li>
+          <li><a href="docs/security.md">Security model</a></li>
+          <li><a href="docs/deployment.md">Deployment</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="PRD.md">PRD — product requirements</a></li>
+          <li><a href="TRD.md">TRD — technical design</a></li>
+          <li><a href="CHANGELOG.md">Changelog</a></li>
+          <li><a href="LICENSE">License</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span class="t-ok">vendor/asset-shield</span> &middot; npm <span class="t-ok-cyan">@vendor/asset-shield</span></p>
+      <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
+        exposure, protects asset access, and increases the cost of reverse engineering.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    // reveal on scroll
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+
+    // sticky header border emphasis under scroll
+    var hdr = document.querySelector('.site-header');
+    var onScroll = function () {
+      hdr.style.borderBottomColor = (window.scrollY > 8) ? 'var(--line-strong)' : 'var(--line)';
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // terminal typewriter
+    var body = document.getElementById('term-body');
+    var rows = body.querySelectorAll('[data-ty]');
+
+    // snapshot static rows (preserve markup), strip the on-the-fly typed ones
+    var snapshot = [];
+    Array.prototype.forEach.call(body.querySelectorAll('.t-ln'), function (ln) {
+      if (!ln.hasAttribute('data-ty')) snapshot.push(ln.outerHTML);
+    });
+    Array.prototype.forEach.call(body.querySelectorAll('.t-ln'), function (ln) {
+      ln.remove();
+    });
+
+    var cursor = document.createElement('span');
+    cursor.className = 'caret';
+    cursor.setAttribute('aria-hidden', 'true');
+
+    var li = 0;
+    function renderStatic() {
+      if (li < snapshot.length) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = snapshot[li];
+        body.appendChild(tmp.firstChild);
+        li++;
+        setTimeout(renderStatic, 120);
+      } else {
+        body.appendChild(cursor);
+        runTyped(0);
+      }
+    }
+
+    function runTyped(idx) {
+      if (idx >= rows.length) {
+        body.appendChild(cursor);
+        return;
+      }
+      var row = rows[idx];
+      var text = row.textContent.replace(/\u00a0/g, '\u00A0').replace(/\s+$/, '');
+      var slot = document.createElement('div');
+      slot.className = row.className;
+      var i = 0;
+      (function step() {
+        if (i <= text.length) {
+          slot.textContent = text.slice(0, i++);
+          body.appendChild(slot);
+          if (cursor.parentNode === body) body.removeChild(cursor);
+          body.appendChild(cursor);
+          setTimeout(step, 11 + Math.random() * 26);
+        } else {
+          if (cursor.parentNode === body) body.removeChild(cursor);
+          setTimeout(function () { runTyped(idx + 1); }, 380);
+        }
+      })();
+    }
+
+    var started = false;
+    function startTerminal() {
+      if (started) return;
+      started = true;
+      renderStatic();
+    }
+    var heroTerm = document.querySelector('.hero .terminal');
+    if (heroTerm) {
+      var hio = new IntersectionObserver(function (es) {
+        es.forEach(function (e) { if (e.isIntersecting) { startTerminal(); hio.disconnect(); } });
+      }, { threshold: 0.3 });
+      hio.observe(heroTerm);
+    }
+    // fallback: start after a delay if observer unavailable
+    setTimeout(function () { if (window.IntersectionObserver) return; startTerminal(); }, 400);
+  })();
+</script>
+</body>
+</html>
