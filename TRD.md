@@ -36,7 +36,7 @@ and no per-request filesystem scanning.
                         ┌────────────────────────────────────────────┐
                         │                BUILD SIDE                    │
                         │  Laravel Vite (vite build)                   │
-                        │  └─ @vendor/asset-shield/vite-plugin         │
+                        │  └─ @vendor/asset-shield                    │
                         │       │ reads chunks + maps                  │
                         │       │ writes registry.json                 │
                         │       │ (optional) obfuscates app JS         │
@@ -165,18 +165,18 @@ Pure dependencies (no cycles). Arrows mean "depends on / uses".
 |---|---|---|
 | `AssetShieldServiceProvider` | merge config, bind manager/signer/driver, Blade directives, routes, commands, publishables, (de)activation | `register()`, `boot()` |
 | `AssetShieldManager` | public facade surface; composition root on top of services | `resolve()`, `url()`, `script()`, `style()`, `sign()`, `isEnabled()`, `status()` |
-| `AssetManifest` | load + cache `manifest.json`; resolve entries → final files; metadata | `file(string $path)`, `resolve(string $entry)`, `cached()`, `lastModified()` |
-| `AssetRegistry` | logical → compiled → opaque ID map; persistence; lookup; validation | `add()`, `opaqueIdFor()`, `compiledPathFor()`, `idToCompiled()`, `save()`, `load()`, `isValid()` |
-| `AssetUrlGenerator` | produce `/assets/{opaqueId}` and optional signed variant | `generate(Iterableable)`, `generateSigned()`, `urlForRegistryId()` |
+| `AssetManifest` | load + cache `manifest.json`; resolve entries → final files; metadata | `resolve()`, `compiledPath()`, `absolutePath()`, `exists()` |
+| `AssetRegistry` | logical → compiled → opaque ID map; persistence; lookup; validation | `create()`, `entryForLogical()`, `compiledForOpaque()`, `fromConfig()`, `fileExists()`, `path()`, `validate()` |
+| `AssetUrlGenerator` | produce `/assets/{opaqueId}` and optional signed variant | `url()`, `urlForOpaque()` |
 | `AssetSigner` (interface) | contract for sign/verify | `sign(assetId, ?expires)`, `verify(assetId, ?expires, signature)` |
 | `HmacAssetSigner` | HMAC-SHA256 under app key; constant-time verify; expiry check | — |
 | `AssetController` | request → resolve → verify → deliver; 403 on failure; never accepts paths | `__invoke(Request, string $asset)` |
 | `AssetResponse` | response builder for JS/CSS/SVG/JSON/fonts/images w/ cache + security headers | `make()` |
 | `AssetDeliveryDriver` | abstraction over file transportation | `deliver()`, `supports()` |
 | `PublicFileDriver` | serve via `public/build` resolved file path (safest for PHP middlewares whitelists) | — |
-| `StreamDriver` | stream via ReadfileStream / passthrough with MIME | — |
-| `MimeMapper` | extension → Content-Type table (JS/CSS/SVG/JSON/woff2/ttf/png/jpeg/webp/gif/ico) | `forPath()` |
-| `OpaqueId` | deterministic HMAC-derived ID from compiled path | `from(FilesystemPath)` |
+| `StreamDriver` | stream via `readfile`-based passthrough with MIME | — |
+| `MimeMapper` | extension → Content-Type table (JS/CSS/SVG/JSON/woff2/ttf/png/jpeg/webp/gif/ico) + family + denylist | `forPath()`, `family()`, `isForbidden()` |
+| `OpaqueId` | deterministic HMAC-derived ID from compiled path; path sanitization | `from()`, `isSafe()`, `canonicalize()` |
 | Commands | install/build/status/doctor | handle() |
 
 ---
@@ -213,8 +213,9 @@ opaqueId = substr( hex( HMAC-SHA256( app_key, "asset-shield:" . canonicalCompile
     {
       "logical": "resources/js/app.js",
       "compiled": "build/assets/app-A91Kx.js",   // server-side only; never in HTML/JS
-      "opaque": "7f92a8c1",
-      "type": "js",
+      // "opaque" is optional in the on-disk file: the Vite plugin omits it, and
+      // the server always re-derives it from the compiled path + app key on load.
+      "type": "script",                          // script | style (MimeMapper families)
       "integrity": "sha384-..."
     }
   ]
@@ -386,11 +387,19 @@ export interface ObfuscationEngine {
 interface AssetDeliveryDriver
 {
     /**
-     * Deliver resolved asset bytes for a validated, registered relative path.
+     * Deliver resolved asset bytes for a validated, registered compiled path.
      * Implementations MUST NOT execute the file or accept arbitrary input paths.
+     * $cacheOverrideSeconds: null = follow AssetResponse defaults.
      */
-    public function deliver(AssetManifest $manifest, string $relativePath, AssetResponse $response): Response;
-    public function supports(AssetManifest $manifest, string $relativePath): bool;
+    public function deliver(
+        AssetManifest $manifest,
+        string $compiledRelativePath,
+        string $contentType,
+        ?int $cacheOverrideSeconds,
+        bool $immutable,
+    ): Response;
+
+    public function supports(AssetManifest $manifest, string $compiledRelativePath): bool;
 }
 ```
 
@@ -446,8 +455,8 @@ interface AssetDeliveryDriver
 | 5 | include/exclude glob rules honored | FR-28 |
 | 6 | source maps disabled default; warning on enable | FR-29/30 |
 | 7 | empty chunks handled without error | — |
-| 8 | dynamic imports preserved after obfuscation | FR-24 |
-| 9 | build failures surface loudly | — |
+| 8 | dynamic imports preserved after obfuscation (registry keeps every chunk) | FR-24 |
+| 9 | missing manifest → warning, build continues; filesystem write errors surface loudly | — |
 
 ---
 
@@ -483,11 +492,11 @@ Composer package: **no** full-framework requirement; only `illuminate/*` pieces 
 
 ---
 
-## 16. Open Questions (Implementation Notes)
+## 16. Resolved Implementation Notes
 
-- Exact persistence path for the registry — `storage/asset-shield/registry.json` (default) with
-  config override; must be outside `public/`.
-- Whether `PublicFileDriver` or `StreamDriver` is default — recommend `PublicFileDriver` for
-  whitelist-friendly production; configurable via `asset-shield.driver`.
-- Signature default: sign all `/assets` URLs when `signature.enabled=true` (recommended) versus
-  allowing inline `unsigned` assets — documentation covers both; default signs.
+- Registry persistence path — `storage/asset-shield/registry.json` (default), config override supported,
+  kept outside `public/` (server-loads via `AssetRegistry::fromConfig`).
+- Default driver — `PublicFileDriver` (whitelist-friendly production); configurable via
+  `asset-shield.driver`; `StreamDriver` for readfile-based passthrough.
+- Signature default — all `/assets` URLs are signed when `signature.enabled=true`; `signed: false`
+  on `AssetShield::url()`/`@shieldVite()` opts out per call; default signs.

@@ -1,0 +1,55 @@
+{
+    "name": "@vendor/asset-shield",
+    "version": "0.1.0",
+    "description": "Vite build plugin for AssetShield: writes the protected-asset registry and optionally obfuscates application JS chunks. Vendoring-safe; CSS never obfuscated.",
+    "type": "module",
+    "files": [
+        "dist"
+    ],
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "scripts": {
+        "build": "tsup",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "keywords": [
+        "vite",
+        "laravel",
+        "assets",
+        "security",
+        "obfuscation",
+        "plugin"
+    ],
+    "license": "MIT",
+    "peerDependencies": {
+        "vite": ">=5.0.0"
+    },
+    "peerDependenciesMeta": {
+        "javascript-obfuscator": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/node": "^22.20.2",
+        "tsup": "^8.3.5",
+        "typescript": "^5.7.2",
+        "vite": "^6.0.0",
+        "vitest": "^3.0.0"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "allowScripts": {
+        "esbuild@0.27.7": true,
+        "esbuild@0.25.12": true
+    }
+}

@@ -1,0 +1,27 @@
+{
+  "resources/js/app.js": {
+    "src": "resources/js/app.js",
+    "file": "assets/app-A91Kx.js",
+    "isEntry": true,
+    "css": [],
+    "assets": [],
+    "integrity": "sha384-KwLqDpyFkPYEy2b1fXnfK2J5bN8UYrIlVlGtZg0VYb9ufmZnKIj7xK5h5QjrPYUR"
+  },
+  "resources/css/app.css": {
+    "src": "resources/css/app.css",
+    "file": "assets/app-2E5Zc7.css",
+    "isEntry": true,
+    "assets": [
+      "assets/din-1A2B.woff2",
+      "assets/logo-D3E4.svg"
+    ]
+  },
+  "resources/fonts/din.woff2": {
+    "src": "resources/fonts/din.woff2",
+    "file": "assets/din-1A2B.woff2"
+  },
+  "resources/images/logo.svg": {
+    "src": "resources/images/logo.svg",
+    "file": "assets/logo-D3E4.svg"
+  }
+}

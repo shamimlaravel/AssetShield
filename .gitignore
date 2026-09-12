@@ -1,0 +1,11 @@
+/vendor
+/composer.lock
+/.phpunit.cache
+/node_modules
+/packages/vite-plugin/node_modules
+/packages/vite-plugin/dist
+/packages/vite-plugin/package-lock.json
+/tests/Fixtures/storage/asset-shield/registry.json
+/.idea
+/.vscode
+*.log

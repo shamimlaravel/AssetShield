@@ -55,6 +55,7 @@ export default defineConfig({
 export type AssetShieldViteOptions = {
     enabled?: boolean;                          // default true
     registryFile?: string;                      // default 'storage/asset-shield/registry.json'
+    buildDir?: string;                          // default 'build' (public-relative compiled dir)
     sourceMaps?: boolean;                       // default false
     obfuscation?: {
         enabled?: boolean;                      // default false
@@ -113,8 +114,8 @@ assetShieldVite({
 ### Dynamic imports & chunks
 
 The plugin never re-bundles: `renderChunk` handles code transform for the chunks that match the
-rules, `generateBundle` writes the registry. Dynamic `import()` boundaries and Rollup code-splitting
-are preserved exactly as Vite produced them.
+rules, and the registry is written from the emitted manifest after the build output lands on disk.
+Dynamic `import()` boundaries and Rollup code-splitting are preserved exactly as Vite produced them.
 
 ### CSS is never obfuscated
 
@@ -140,11 +141,13 @@ It writes (or updates) one JSON registry, e.g. `storage/asset-shield/registry.js
   "entries": [
     { "logical": "resources/js/app.js",
       "compiled": "build/assets/app-A91Kx.js",   // server-only
-      "opaque": "7f92a8c1",
-      "type": "js", "integrity": "sha384-…" }
+      "type": "script", "integrity": "sha384-…" }
   ]
 }
 ```
+
+The `opaque` field is intentionally absent from the plugin output — the server derives it from the
+compiled path under `APP_KEY` when it loads the registry, so the plugin never needs the key.
 
 The **server-side** Laravel package reads this file (cached in production). If you prefer, generate
 the same file with `php artisan asset-shield:build` instead of the plugin — both paths are valid.

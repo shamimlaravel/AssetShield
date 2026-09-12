@@ -1,0 +1,10 @@
+{
+    "name": "asset-shield-package",
+    "private": true,
+    "description": "Root package for AssetShield (Laravel package + Vite plugin) monorepo scripts.",
+    "scripts": {
+        "test": "npm run test:php && npm run test:node",
+        "test:php": "vendor\\bin\\pest",
+        "test:node": "npm --prefix packages/vite-plugin run test"
+    }
+}

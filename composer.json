@@ -1,0 +1,68 @@
+{
+    "name": "vendor/asset-shield",
+    "description": "Laravel-native asset protection layer for Vite-powered applications. Opaque, signed, expiring asset URLs. Source maps off. Vendor-safe JS obfuscation.",
+    "type": "library",
+    "keywords": ["laravel", "vite", "assets", "security", "signing", "obfuscation", "hmac"],
+    "license": "MIT",
+    "homepage": "https://github.com/vendor/asset-shield",
+    "authors": [
+        {
+            "name": "AssetShield Contributors",
+            "homepage": "https://github.com/vendor/asset-shield"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/collections": "^13.0",
+        "illuminate/console": "^13.0",
+        "illuminate/contracts": "^13.0",
+        "illuminate/filesystem": "^13.0",
+        "illuminate/http": "^13.0",
+        "illuminate/routing": "^13.0",
+        "illuminate/support": "^13.0",
+        "illuminate/view": "^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vendor\\AssetShield\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vendor\\AssetShield\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vendor\\AssetShield\\AssetShieldServiceProvider"
+            ],
+            "aliases": {
+                "AssetShield": "Vendor\\AssetShield\\Facades\\AssetShield"
+            }
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test:unit": "vendor/bin/pest --testsuite=Unit",
+        "test:feature": "vendor/bin/pest --testsuite=Feature",
+        "lint": "@php scripts/lint.php"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "support": {
+        "issues": "https://github.com/vendor/asset-shield/issues",
+        "source": "https://github.com/vendor/asset-shield"
+    }
+}

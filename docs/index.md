@@ -14,7 +14,7 @@ honestly and securely.
 | [Installation](installation.md) | How-to | Composer + npm install, provider auto-discovery, first build |
 | [Configuration](configuration.md) | Reference | Every config key, env var, and default |
 | [Usage](usage.md) | How-to | Blade directives, PHP API, `@shieldVite`, resolving and emitting assets |
-| [Vite integration](vite.md) | How-to | The `@vendor/asset-shield/vite-plugin`, obfuscation presets, vendor rules |
+| [Vite integration](vite.md) | How-to | The `@vendor/asset-shield` plugin, obfuscation presets, vendor rules |
 | [Signed URLs](signed-urls.md) | How-to | HMAC signing, expiration, verification, direct `AssetSigner` use |
 | [Security model](security.md) | Explanation | Threat model, what is and isn't protected, honest limits |
 | [Production deployment](deployment.md) | How-to | `asset-shield:doctor`, builds, Nginx, CDN, cache behavior |
