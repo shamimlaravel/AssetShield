@@ -1,9 +1,9 @@
 <?php
 
-namespace Vendor\AssetShield;
+namespace Shamimstack\AssetShield;
 
-use Vendor\AssetShield\Exceptions\AssetNotFoundException;
-use Vendor\AssetShield\Signer\AssetSigner;
+use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
+use Shamimstack\AssetShield\Signer\AssetSigner;
 
 /**
  * Produces protected asset URLs.

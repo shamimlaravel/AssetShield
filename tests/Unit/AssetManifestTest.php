@@ -1,8 +1,8 @@
 <?php
 
-use Vendor\AssetShield\AssetManifest;
-use Vendor\AssetShield\Exceptions\AssetNotFoundException;
-use Vendor\AssetShield\Exceptions\ManifestNotFoundException;
+use Shamimstack\AssetShield\AssetManifest;
+use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
+use Shamimstack\AssetShield\Exceptions\ManifestNotFoundException;
 
 test('manifest loads the fixture and resolves entries', function () {
     $manifest = app(AssetManifest::class);
@@ -44,7 +44,7 @@ test('a missing manifest throws ManifestNotFoundException', function () {
     $tmp = storage_path('missing-manifest.json');
     @unlink($tmp);
 
-    config()->set('asset-shield.manifest_path', $tmp);
+    config()->set('asset-shield.build.manifest', $tmp);
     $this->reloadAssetShield();
 
     app(AssetManifest::class)->data();
@@ -54,7 +54,7 @@ test('a malformed manifest throws ManifestNotFoundException', function () {
     $tmp = storage_path('broken-manifest.json');
     file_put_contents($tmp, '{"broken": ');
 
-    config()->set('asset-shield.manifest_path', $tmp);
+    config()->set('asset-shield.build.manifest', $tmp);
     $this->reloadAssetShield();
 
     app(AssetManifest::class)->data();

@@ -1,13 +1,13 @@
 <?php
 
-use Vendor\AssetShield\Support\OpaqueId;
+use Shamimstack\AssetShield\Support\OpaqueId;
 
-test('opaque ids are deterministic 16-hex-char hashes', function () {
+test('opaque ids are deterministic prefixed hashes', function () {
     $a = OpaqueId::from('build/assets/app-A91Kx.js', 'test-secret');
     $b = OpaqueId::from('build/assets/app-A91Kx.js', 'test-secret');
 
     expect($a)->toBe($b)
-        ->and($a)->toMatch('/^[a-f0-9]{16}$/');
+        ->and($a)->toMatch('/^as_[a-f0-9]{16}$/');
 });
 
 test('opaque ids differ between application keys', function () {

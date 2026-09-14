@@ -56,9 +56,12 @@ describe('obfuscation engine', () => {
         expect(fakeObfuscator).not.toHaveBeenCalled();
     });
 
-    it('warns once but keeps the chunk when the obfuscator is unavailable', async () => {
+    it('warns once but keeps the chunk when the obfuscator is unavailable (failOnError false)', async () => {
         const engine = new ObfuscationEngine(() => undefined);
-        const plugin = assetShieldVite({ obfuscation: { enabled: true } }, { engine } as { engine: ObfuscationEngine });
+        const plugin = assetShieldVite(
+            { obfuscation: { enabled: true }, failOnError: false },
+            { engine } as { engine: ObfuscationEngine },
+        );
 
         const warnings: string[] = [];
         const result = await (plugin.renderChunk as (

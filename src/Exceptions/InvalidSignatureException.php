@@ -1,6 +1,6 @@
 <?php
 
-namespace Vendor\AssetShield\Exceptions;
+namespace Shamimstack\AssetShield\Exceptions;
 
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;

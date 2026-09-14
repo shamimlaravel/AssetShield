@@ -1,10 +1,13 @@
 <?php
 
-namespace Vendor\AssetShield\Commands;
+namespace Shamimstack\AssetShield\Commands;
 
 use Illuminate\Console\Command;
-use Vendor\AssetShield\AssetManifest;
-use Vendor\AssetShield\AssetRegistry;
+use Symfony\Component\Process\Process;
+use Shamimstack\AssetShield\AssetManifest;
+use Shamimstack\AssetShield\AssetRegistry;
+use Shamimstack\AssetShield\Masking\MaskPlanner;
+use Shamimstack\AssetShield\Masking\Legend;
 
 class DoctorCommand extends Command
 {
@@ -12,9 +15,9 @@ class DoctorCommand extends Command
 
     protected $description = 'Inspect the deployment for AssetShield security and configuration problems';
 
-    public function handle(AssetManifest $manifest, AssetRegistry $registry): int
+    public function handle(AssetManifest $manifest, AssetRegistry $registry, Legend $legend): int
     {
-        $checks = $this->checks($manifest, $registry);
+        $checks = $this->checks($manifest, $registry, $legend);
         $failures = 0;
         $warnings = 0;
 
@@ -24,6 +27,7 @@ class DoctorCommand extends Command
             foreach ($checks as $check) {
                 match ($check['state']) {
                     'ok' => $this->line('  <fg=green;options=bold>✓</> '.$check['label'].' <fg=gray>'.$check['detail'].'</>'),
+                    'info' => $this->line('  <fg=cyan>·</> '.$check['label'].' <fg=gray>'.$check['detail'].'</>'),
                     'warn' => $this->line('  <fg=yellow;options=bold>!</> '.$check['label'].' <fg=yellow>'.$check['detail'].'</>'),
                     default => $this->line('  <fg=red;options=bold>✗</> '.$check['label'].' <fg=red>'.$check['detail'].'</>'),
                 };
@@ -63,7 +67,7 @@ class DoctorCommand extends Command
     /**
      * @return array<int,array{state:'ok'|'warn'|'fail',label:string,detail:string}>
      */
-    private function checks(AssetManifest $manifest, AssetRegistry $registry): array
+    private function checks(AssetManifest $manifest, AssetRegistry $registry, Legend $legend): array
     {
         $config = config('asset-shield');
         $environment = (string) config('app.env');
@@ -91,10 +95,11 @@ class DoctorCommand extends Command
         }
 
         // 4. Source maps (config + manifest scan)
-        if ((bool) ($config['source_maps'] ?? false)) {
-            $checks[] = $this->row('fail', 'Source maps enabled in config', 'asset-shield.source_maps=true. Hosted source maps are never hidden — disable in production.');
+        $build = (array) ($config['build'] ?? []);
+        if ((bool) ($build['source_maps'] ?? false)) {
+            $checks[] = $this->row('fail', 'Source maps enabled in config', 'asset-shield.build.source_maps=true. Hosted source maps are never hidden — disable in production.');
         } else {
-            $checks[] = $this->row('ok', 'Source maps disabled', 'asset-shield.source_maps=false');
+            $checks[] = $this->row('ok', 'Source maps disabled', 'asset-shield.build.source_maps=false');
         }
 
         $mapFiles = $this->sourceMapFiles($manifest);
@@ -145,7 +150,137 @@ class DoctorCommand extends Command
             }
         }
 
+        // 9. Masking legend consistency
+        $mask = (array) ($config['mask'] ?? []);
+        if ((bool) ($mask['enabled'] ?? false)) {
+            if (! $legend->exists()) {
+                $checks[] = $this->row('warn', 'Masking enabled but legend missing', $legend->path().' — run "npm run build" with the @asset-shield/vite-plugin first.');
+            } else {
+                $planner = new MaskPlanner([
+                    'enabled' => true,
+                    'strategy' => (string) ($mask['strategy'] ?? 'nameless'),
+                    'seed' => (string) ($mask['seed'] ?? ''),
+                    'aliases' => (array) ($mask['aliases'] ?? []),
+                ]);
+
+                $mismatches = [];
+
+                if ($manifest->exists()) {
+                    foreach ($manifest->data() as $logical => $record) {
+                        if (! is_array($record) || ! isset($record['file']) || ! is_string($record['file'])) {
+                            continue;
+                        }
+
+                        $entry = $legend->entryForMasked($record['file']);
+
+                        if ($entry === null) {
+                            continue;
+                        }
+
+                        $expected = $planner->plan((string) $logical, $entry['original'])['file'];
+
+                        if ($expected !== $entry['masked']) {
+                            $mismatches[] = (string) $logical;
+                        }
+                    }
+                }
+
+                if ($mismatches === []) {
+                    $checks[] = $this->row('ok', 'Masking legend valid', sprintf('%d asset mappings in %s', count($legend->entries()), $legend->path()));
+                } else {
+                    $checks[] = $this->row('fail', 'Masking legend mismatch', implode(', ', array_slice($mismatches, 0, 5)).' — the PHP mask.seed must match the plugin seed.');
+                }
+            }
+        } else {
+            $checks[] = $this->row('info', 'Masking disabled', '');
+        }
+
+        // 10. Duplicate output filenames in the manifest
+        if ($manifest->exists()) {
+            $basenames = [];
+
+            foreach ($manifest->data() as $record) {
+                if (is_array($record) && isset($record['file']) && is_string($record['file'])) {
+                    $basenames[basename($record['file'])][] = basename($record['file']);
+                }
+            }
+
+            $duplicates = [];
+            foreach ($basenames as $basename => $occurrences) {
+                if (count($occurrences) > 1) {
+                    $duplicates[] = $basename;
+                }
+            }
+
+            if ($duplicates !== []) {
+                $checks[] = $this->row('warn', 'Duplicate output filenames', implode(', ', array_slice($duplicates, 0, 5)).' — multiple manifest entries resolve to the same basename.');
+            } else {
+                $checks[] = $this->row('ok', 'No duplicate output filenames', '');
+            }
+        }
+
+        // 11. Broken manifest references
+        if ($manifest->exists()) {
+            $missing = [];
+
+            foreach ($manifest->data() as $record) {
+                if (is_array($record) && isset($record['file']) && is_string($record['file'])) {
+                    $file = $manifest->compiledPath($record['file']);
+
+                    if ($manifest->absolutePath($file) === null) {
+                        $missing[] = $record['file'];
+                    }
+                }
+            }
+
+            if ($missing !== []) {
+                $checks[] = $this->row('warn', 'Manifest references missing files on disk', implode(', ', array_slice($missing, 0, 5)).' — rebuild ("npm run build" then "asset-shield:build").');
+            } else {
+                $checks[] = $this->row('ok', 'All manifest files exist on disk', '');
+            }
+        }
+
+        // 12. Toolchain versions (informational)
+        foreach ([
+            'PHP' => ['php', '-v'],
+            'Node' => ['node', '-v'],
+            'NPM' => ['npm', '-v'],
+        ] as $label => [$bin, $arg]) {
+            $checks[] = $this->versionCheck($label, $bin, $arg);
+        }
+        $checks[] = $this->row('info', 'Laravel', app()->version());
+
         return $checks;
+    }
+
+    private function versionCheck(string $label, string $bin, string $arg): array
+    {
+        $command = str_contains(strtolower(PHP_OS_FAMILY), 'win')
+            ? ($bin === 'npm' ? 'npm.cmd' : [$bin, $arg])
+            : [$bin, $arg];
+
+        if (is_string($command)) {
+            try {
+                $process = new Process([$command, $arg], null, null, null, 3);
+            } catch (\Throwable $e) {
+                return $this->row('warn', $label.' unavailable', $e->getMessage());
+            }
+        } else {
+            $process = new Process($command, null, null, null, 3);
+        }
+
+        try {
+            $process->run();
+            $output = trim($process->getOutput() ?: $process->getErrorOutput());
+        } catch (\Throwable $e) {
+            return $this->row('warn', $label.' unavailable', $e->getMessage());
+        }
+
+        if (! $process->isSuccessful() || $output === '') {
+            return $this->row('warn', $label.' unavailable', 'Could not detect '.$label.' — the Node toolchain is expected for frontend builds.');
+        }
+
+        return $this->row('info', $label, strtok($output, "\n"));
     }
 
     private function envLocationCheck(string $path, string $label): array

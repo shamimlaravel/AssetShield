@@ -1,9 +1,10 @@
 <?php
 
-namespace Vendor\AssetShield\Commands;
+namespace Shamimstack\AssetShield\Commands;
 
 use Illuminate\Console\Command;
-use Vendor\AssetShield\AssetShieldManager;
+use Shamimstack\AssetShield\AssetShieldManager;
+use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
 
 class StatusCommand extends Command
 {
@@ -11,9 +12,10 @@ class StatusCommand extends Command
 
     protected $description = 'Print the AssetShield configuration snapshot';
 
-    public function handle(AssetShieldManager $manager): int
+    public function handle(AssetShieldManager $manager, ObfuscationEngine $engine): int
     {
         $status = $manager->status();
+        $obfuscationEnabled = (bool) $status['obfuscation_enabled'];
 
         if ($this->option('json')) {
             $this->line(json_encode($status, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
@@ -23,16 +25,19 @@ class StatusCommand extends Command
 
         $this->line('AssetShield');
         $this->line('-----------');
-        $this->line(sprintf('  %-18s %s', 'Enabled:', $this->yesNo($status['enabled'])));
-        $this->line(sprintf('  %-18s %s', 'Mode:', $status['mode']));
-        $this->line(sprintf('  %-18s %s', 'Route prefix:', $status['route_prefix']));
-        $this->line(sprintf('  %-18s %s', 'Manifest:', $status['manifest_found'] ? 'found' : 'not found'));
-        $this->line(sprintf('  %-18s %s', 'Registry:', $this->registryState($status)));
-        $this->line(sprintf('  %-18s %s', 'Signed URLs:', $status['signed_urls'] ? 'enabled' : 'disabled'));
-        $this->line(sprintf('  %-18s %ss', 'Expiration:', $status['expires']));
-        $this->line(sprintf('  %-18s %s', 'Obfuscation:', $status['obfuscation_enabled'] ? $status['obfuscation_preset'] : 'disabled'));
-        $this->line(sprintf('  %-18s %s', 'Source Maps:', $status['source_maps'] ? 'enabled' : 'disabled'));
-        $this->line(sprintf('  %-18s %s', 'Driver:', $status['driver']));
+        $this->line(sprintf('  %-20s %s', 'Enabled:', $this->yesNo($status['enabled'])));
+        $this->line(sprintf('  %-20s %s', 'Environment:', $status['environment']));
+        $this->line(sprintf('  %-20s %s', 'Runtime delivery:', $this->yesNo($status['runtime_enabled'])));
+        $this->line(sprintf('  %-20s %s', 'Route prefix:', $status['route_prefix']));
+        $this->line(sprintf('  %-20s %s', 'Manifest:', $status['manifest_found'] ? 'found' : 'not found'));
+        $this->line(sprintf('  %-20s %s', 'Registry:', $this->registryState($status)));
+        $this->line(sprintf('  %-20s %s', 'Signed URLs:', $this->yesNo($status['signed_urls'])));
+        $this->line(sprintf('  %-20s %s', 'Expiration:', $status['expires'].'s'));
+        $this->line(sprintf('  %-20s %s', 'Masking:', $status['mask_enabled'] ? $status['mask_strategy'] : 'disabled'));
+        $this->line(sprintf('  %-20s %s', 'Obfuscation:', $obfuscationEnabled ? $status['obfuscation_preset'] : 'disabled'));
+        $this->line(sprintf('  %-20s %s', '  . engine:', $engine->isAvailable() ? $this->yesNo(true) : 'not found'));
+        $this->line(sprintf('  %-20s %s', 'Source Maps:', $this->yesNo($status['source_maps'])));
+        $this->line(sprintf('  %-20s %s', 'Driver:', $status['driver']));
 
         return self::SUCCESS;
     }

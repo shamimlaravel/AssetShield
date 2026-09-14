@@ -1,16 +1,16 @@
 <?php
 
-namespace Vendor\AssetShield\Delivery;
+namespace Shamimstack\AssetShield\Delivery;
 
-use Vendor\AssetShield\AssetManifest;
+use Shamimstack\AssetShield\AssetIdentity;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Abstraction over asset byte transportation. Implementations MUST NOT execute
- * the file and MUST NOT accept arbitrary input paths — they only receive a
- * manifest, a registry-validated relative compiled path, and response hints.
+ * the file and MUST NOT accept arbitrary input paths — they only ever receive
+ * a registry-validated AssetIdentity plus cache hints.
  *
- * MVP drivers: PublicFileDriver, StreamDriver.
+ * MVP drivers: PublicDriver, StreamDriver.
  * Future drivers (reserved, not implemented): Nginx X-Accel-Redirect,
  * Apache X-Sendfile, S3, Cloudflare R2, generic CDN.
  */
@@ -19,20 +19,17 @@ interface AssetDeliveryDriver
     /**
      * Deliver the bytes of a validated, registered asset.
      *
-     * @param  string  $contentType   MIME type chosen by the controller.
      * @param  int|null  $cacheOverrideSeconds  remaining signature lifetime.
-     * @param  bool  $immutable      whether this is an unsigned immutable asset.
+     * @param  bool  $immutable  whether this is an unsigned immutable asset.
      */
     public function deliver(
-        AssetManifest $manifest,
-        string $compiledRelativePath,
-        string $contentType,
+        AssetIdentity $asset,
         ?int $cacheOverrideSeconds = null,
         bool $immutable = true,
     ): Response;
 
     /**
-     * Whether this driver can serve the given compiled relative path.
+     * Whether this driver can serve the given validated asset.
      */
-    public function supports(AssetManifest $manifest, string $compiledRelativePath): bool;
+    public function supports(AssetIdentity $asset): bool;
 }

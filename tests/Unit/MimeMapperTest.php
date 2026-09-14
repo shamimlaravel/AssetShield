@@ -1,6 +1,6 @@
 <?php
 
-use Vendor\AssetShield\Support\MimeMapper;
+use Shamimstack\AssetShield\Support\MimeMapper;
 
 test('MimeMapper classifies families', function () {
     expect(MimeMapper::family('build/assets/app-A91Kx.js'))->toBe('script')

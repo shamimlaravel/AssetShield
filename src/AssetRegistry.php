@@ -1,32 +1,39 @@
 <?php
 
-namespace Vendor\AssetShield;
+namespace Shamimstack\AssetShield;
 
 use Illuminate\Contracts\Foundation\Application;
 use InvalidArgumentException;
-use Vendor\AssetShield\Exceptions\AssetNotFoundException;
-use Vendor\AssetShield\Exceptions\RegistryInvalidException;
-use Vendor\AssetShield\Support\MimeMapper;
-use Vendor\AssetShield\Support\OpaqueId;
+use Shamimstack\AssetShield\Exceptions\RegistryInvalidException;
+use Shamimstack\AssetShield\Support\MimeMapper;
+use Shamimstack\AssetShield\Support\OpaqueId;
 
 /**
- * Maps logical assets -> compiled assets -> protected opaque identifiers.
+ * Maps logical assets -> compiled files -> protected opaque identifiers.
  *
  *   resources/js/app.js
  *           |
  *           v
- *   build/assets/app-A91Kx.js
+ *   build/assets/app-A91Kx.js          (file; may be a masked name)
  *           |
  *           v
- *   7f92a8c1  (HMAC-derived under APP_KEY)
+ *   as_7f92a8c1d2e3...                 (HMAC-derived under APP_KEY, never stored)
  *
- * The registry is a build artifact. Opaque identifiers are always derived
- * server-side from the application key; neither the Vite plugin nor the client
- * ever sees the real compiled path or the key.
+ * The registry is a build artifact written as:
+ *
+ *   { "version": 1, "built_at": "...", "assets": {
+ *       "app.js": { "type": "script", "file": "8f4a1c7d.js",
+ *                   "original": "app-A91Kx.js", "integrity": "sha384-..." }
+ *   } }
+ *
+ * Opaque identifiers are always derived server-side from the application key;
+ * neither the Vite plugin nor the client ever sees the real compiled path or
+ * the key. FNV-based mask names are presentational only and are never
+ * used as security.
  */
 class AssetRegistry
 {
-    /** @var array<string, array{logical:string,compiled:string,opaque:string,type:string,integrity:?string}> */
+    /** @var array<string, array{logical:string,file:string,original:?string,opaque:string,type:string,integrity:?string}> */
     private array $entries = [];
 
     /** @var array<string,string> opaque -> logical */
@@ -45,7 +52,7 @@ class AssetRegistry
 
     public static function fromConfig(Application $app): self
     {
-        $path = (string) $app['config']->get('asset-shield.registry_path', 'storage/asset-shield/registry.json');
+        $path = (string) $app['config']->get('asset-shield.build.registry', 'storage/app/assetshield/registry.json');
 
         if ($path === '' || preg_match('/^[A-Za-z]:[\\\\\/]|^\//', $path) !== 1) {
             $path = $app->storagePath($path);
@@ -81,13 +88,13 @@ class AssetRegistry
 
         $decoded = json_decode((string) file_get_contents($this->registryPath), true);
 
-        if (! is_array($decoded) || ! isset($decoded['entries']) || ! is_array($decoded['entries'])) {
-            throw RegistryInvalidException::invalid($this->registryPath, 'missing "entries" array');
+        if (! is_array($decoded) || ! isset($decoded['assets']) || ! is_array($decoded['assets'])) {
+            throw RegistryInvalidException::invalid($this->registryPath, 'missing "assets" map');
         }
 
         $entries = [];
-        foreach ($decoded['entries'] as $index => $raw) {
-            $entry = $this->normalizeRaw((array) $raw, $index);
+        foreach ($decoded['assets'] as $logical => $raw) {
+            $entry = $this->normalizeRaw((string) $logical, (array) $raw);
             $entries[$entry['opaque']] = $entry;
         }
 
@@ -96,25 +103,31 @@ class AssetRegistry
     }
 
     /**
-     * Replace the in-memory registry from a list of entries and materialize the
+     * Replace the in-memory registry from a list of rows and materialize the
      * server-side opaque identifiers. Persists unless $persist is false.
      *
-     * @param  array<int,array{logical:string,compiled:string,type:?string,integrity:?string}>  $rows
-     * @return array<string, array{logical:string,compiled:string,opaque:string,type:string,integrity:?string}>
+     * @param  array<int,array{logical:string,file:string,type:?string,integrity:?string,original:?string}>  $rows
+     * @return array<string, array{logical:string,file:string,original:?string,opaque:string,type:string,integrity:?string}>
      */
     public function create(array $rows, bool $persist = true): array
     {
         $entries = [];
+        $seenLogicals = [];
 
         foreach ($rows as $index => $row) {
             $logical = (string) ($row['logical'] ?? '');
-            $compiled = (string) ($row['compiled'] ?? '');
+            $file = (string) ($row['file'] ?? '');
 
-            if ($logical === '' || $compiled === '' || ! OpaqueId::isSafe($compiled)) {
-                throw new InvalidArgumentException('AssetShield registry entries require a logical key and a safe compiled path (row #'.$index.').');
+            if ($logical === '' || $file === '' || ! OpaqueId::isSafe($file)) {
+                throw new InvalidArgumentException('AssetShield registry entries require a logical key and a safe file path (row #'.$index.').');
             }
 
-            $opaque = OpaqueId::from($compiled, $this->appKey);
+            if (isset($seenLogicals[$logical])) {
+                throw new InvalidArgumentException('AssetShield registry logical key collision for "'.$logical.'".');
+            }
+            $seenLogicals[$logical] = true;
+
+            $opaque = OpaqueId::from($file, $this->appKey);
 
             if (isset($entries[$opaque])) {
                 throw new InvalidArgumentException('AssetShield opaque id collision for "'.$logical.'" and "'.$entries[$opaque]['logical'].'".');
@@ -122,9 +135,10 @@ class AssetRegistry
 
             $entries[$opaque] = [
                 'logical' => $logical,
-                'compiled' => OpaqueId::canonicalize($compiled),
+                'file' => OpaqueId::canonicalize($file),
+                'original' => isset($row['original']) && (string) $row['original'] !== '' ? (string) $row['original'] : null,
                 'opaque' => $opaque,
-                'type' => (string) ($row['type'] ?? MimeMapper::family($compiled)),
+                'type' => (string) ($row['type'] ?? MimeMapper::family($file)),
                 'integrity' => isset($row['integrity']) ? (string) $row['integrity'] : null,
             ];
         }
@@ -185,11 +199,25 @@ class AssetRegistry
         return $this->logicalIndex[$logical] ?? null;
     }
 
-    public function compiledForOpaque(string $opaque): ?string
+    /**
+     * Compiled file (public-root-relative) for an opaque id, or null.
+     */
+    public function fileForOpaque(string $opaque): ?string
     {
         $entry = $this->entryForOpaque($opaque);
 
-        return $entry['compiled'] ?? null;
+        return $entry['file'] ?? null;
+    }
+
+    /**
+     * Pre-mask compiled filename for a logical entry, or null when the
+     * asset was not renamed.
+     */
+    public function originalForLogical(string $logical): ?string
+    {
+        $entry = $this->entryForLogical($logical);
+
+        return $entry['original'] ?? null;
     }
 
     /**
@@ -203,20 +231,20 @@ class AssetRegistry
         $problems = [];
 
         if (empty($this->entries)) {
-            $problems[] = 'Registry contains no entries. Run `php artisan asset-shield:build`.';
+            $problems[] = 'Registry contains no assets. Run `php artisan asset-shield:build`.';
         }
 
         foreach ($this->entries as $entry) {
-            if (! OpaqueId::isSafe($entry['compiled'])) {
-                $problems[] = '[compiled "'.$entry['compiled'].'"] contains an unsafe path (traversal or absolute).';
+            if (! OpaqueId::isSafe($entry['file'])) {
+                $problems[] = '[file "'.$entry['file'].'"] contains an unsafe path (traversal or absolute).';
             }
 
-            if (MimeMapper::isForbidden($entry['compiled'])) {
-                $problems[] = '[compiled "'.$entry['compiled'].'"] points at a forbidden server-side file.';
+            if (MimeMapper::isForbidden($entry['file'])) {
+                $problems[] = '[file "'.$entry['file'].'"] points at a forbidden server-side file.';
             }
 
-            if ($checkFiles && $manifest->absolutePath($entry['compiled']) === null) {
-                $problems[] = '[compiled "'.$entry['compiled'].'"] does not exist inside the public build directory.';
+            if ($checkFiles && $manifest->absolutePath($entry['file']) === null) {
+                $problems[] = '[file "'.$entry['file'].'"] does not exist inside the public build directory.';
             }
         }
 
@@ -235,10 +263,29 @@ class AssetRegistry
             throw new \RuntimeException('AssetShield could not create the registry directory "'.$dir.'".');
         }
 
+        $assets = [];
+
+        foreach ($this->entries as $entry) {
+            $asset = [
+                'type' => $entry['type'],
+                'file' => $entry['file'],
+            ];
+
+            if ($entry['original'] !== null) {
+                $asset['original'] = $entry['original'];
+            }
+
+            if ($entry['integrity'] !== null) {
+                $asset['integrity'] = $entry['integrity'];
+            }
+
+            $assets[$entry['logical']] = $asset;
+        }
+
         $payload = [
             'version' => 1,
             'built_at' => now()->toIso8601String(),
-            'entries' => array_values($this->entries),
+            'assets' => $assets,
         ];
 
         if (@file_put_contents($this->registryPath, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
@@ -271,31 +318,31 @@ class AssetRegistry
         }
     }
 
-    private function normalizeRaw(array $raw, int $index): array
+    private function normalizeRaw(string $logical, array $raw): array
     {
-        $logical = (string) ($raw['logical'] ?? '');
-        $compiled = (string) ($raw['compiled'] ?? '');
+        $file = (string) ($raw['file'] ?? '');
 
-        if ($logical === '' || $compiled === '') {
-            throw RegistryInvalidException::invalid($this->registryPath, 'entry #'.$index.' is missing "logical" or "compiled".');
+        if ($logical === '' || $file === '') {
+            throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.($logical === '' ? '(empty)' : $logical).'" is missing "file".');
         }
 
-        if (! OpaqueId::isSafe($compiled)) {
-            throw RegistryInvalidException::invalid($this->registryPath, 'entry "'.$logical.'" has an unsafe compiled path "'.$compiled.'".');
+        if (! OpaqueId::isSafe($file)) {
+            throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.$logical.'" has an unsafe file path "'.$file.'".');
         }
 
         $opaque = (string) ($raw['opaque'] ?? '');
-        $expected = OpaqueId::from($compiled, $this->appKey);
+        $expected = OpaqueId::from($file, $this->appKey);
 
         if ($opaque !== '' && $opaque !== $expected) {
-            throw RegistryInvalidException::invalid($this->registryPath, 'entry "'.$logical.'" has a stored opaque id that does not match the application key.');
+            throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.$logical.'" has a stored opaque id that does not match the application key.');
         }
 
         return [
             'logical' => $logical,
-            'compiled' => OpaqueId::canonicalize($compiled),
+            'file' => OpaqueId::canonicalize($file),
+            'original' => isset($raw['original']) && (string) $raw['original'] !== '' ? (string) $raw['original'] : null,
             'opaque' => $expected,
-            'type' => (string) ($raw['type'] ?? MimeMapper::family($compiled)),
+            'type' => (string) ($raw['type'] ?? MimeMapper::family($file)),
             'integrity' => isset($raw['integrity']) ? (string) $raw['integrity'] : null,
         ];
     }

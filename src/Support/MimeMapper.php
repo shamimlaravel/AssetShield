@@ -1,6 +1,6 @@
 <?php
 
-namespace Vendor\AssetShield\Support;
+namespace Shamimstack\AssetShield\Support;
 
 /**
  * Extension -> Content-Type mapping for the supported protected asset types,

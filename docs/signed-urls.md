@@ -33,7 +33,7 @@ Verification:
 ## Using it through the facade
 
 ```php
-use Vendor\AssetShield\Facades\AssetShield;
+use Shamimstack\AssetShield\Facades\AssetShield;
 
 // signed, non-expiring (signed URL w/o expiry)
 AssetShield::url('resources/js/app.js', signed: true);
@@ -42,7 +42,7 @@ AssetShield::url('resources/js/app.js', signed: true);
 AssetShield::url('resources/js/app.js', signed: true, expires: now()->addMinutes(10));
 ```
 
-When `config('asset-shield.signature.enabled')` is `true`, `script()` / `style()` / `url()` emit
+When `config('asset-shield.runtime.signed_urls')` is `true`, `script()` / `style()` / `url()` emit
 signed, expiring URLs automatically using the configured default lifetime (`expires` = 300s by
 default).
 
@@ -51,7 +51,7 @@ default).
 Extract the signer from the container when you need a fine-grained API:
 
 ```php
-use Vendor\AssetShield\Signer\AssetSigner;
+use Shamimstack\AssetShield\Signer\AssetSigner;
 
 $signer = app(AssetSigner::class);   // resolves HmacAssetSigner
 

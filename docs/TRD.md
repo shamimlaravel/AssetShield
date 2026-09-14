@@ -36,7 +36,7 @@ and no per-request filesystem scanning.
                         ┌────────────────────────────────────────────┐
                         │                BUILD SIDE                    │
                         │  Laravel Vite (vite build)                   │
-                        │  └─ @vendor/asset-shield                    │
+                        │  └─ @asset-shield/vite-plugin                    │
                         │       │ reads chunks + maps                  │
                         │       │ writes registry.json                 │
                         │       │ (optional) obfuscates app JS         │
@@ -86,7 +86,7 @@ asset-shield/
 │   │   └── HmacAssetSigner.php
 │   ├── Delivery/
 │   │   ├── AssetDeliveryDriver.php         (interface)
-│   │   ├── PublicFileDriver.php
+│   │   ├── PublicDriver.php
 │   │   ├── StreamDriver.php
 │   │   └── Contracts/AugmentedResponse.php
 │   ├── Support/
@@ -151,7 +151,7 @@ Pure dependencies (no cycles). Arrows mean "depends on / uses".
       │
       ├───────────────► Delivery\AssetDeliveryDriver (interface)
       │                    ▲
-      │                    ├── Delivery\PublicFileDriver
+      │                    ├── Delivery\PublicDriver
       │                    └── Delivery\StreamDriver
       │
       ├───────────────► Facades\AssetShield ─────────► App alias → AssetShieldManager
@@ -173,7 +173,7 @@ Pure dependencies (no cycles). Arrows mean "depends on / uses".
 | `AssetController` | request → resolve → verify → deliver; 403 on failure; never accepts paths | `__invoke(Request, string $asset)` |
 | `AssetResponse` | response builder for JS/CSS/SVG/JSON/fonts/images w/ cache + security headers | `make()` |
 | `AssetDeliveryDriver` | abstraction over file transportation | `deliver()`, `supports()` |
-| `PublicFileDriver` | serve via `public/build` resolved file path (safest for PHP middlewares whitelists) | — |
+| `PublicDriver` | serve via `public/build` resolved file path (safest for PHP middlewares whitelists) | — |
 | `StreamDriver` | stream via `readfile`-based passthrough with MIME | — |
 | `MimeMapper` | extension → Content-Type table (JS/CSS/SVG/JSON/woff2/ttf/png/jpeg/webp/gif/ico) + family + denylist | `forPath()`, `family()`, `isForbidden()` |
 | `OpaqueId` | deterministic HMAC-derived ID from compiled path; path sanitization | `from()`, `isSafe()`, `canonicalize()` |
@@ -261,7 +261,7 @@ interface AssetSigner
 - Timing-safe via `hash_equals` (NFR-S3).
 - Secrets never logged, emitted, or embedded in client artifacts (NFR-S4).
 - Expiration validation rejects past timestamps regardless of signature validity (pre-empts replay).
-- Default expiration from `config('asset-shield.signature.expires', 300)`.
+- Default expiration from `config('asset-shield.runtime.expires', 300)`.
 
 ---
 
@@ -279,7 +279,7 @@ interface AssetSigner
    ▼
  AssetController::__invoke
    │  1. id = route param {asset}            (never a filesystem path — regex: [a-f0-9]{8,32})
-   │  2. if signature.enabled and query present → AssetSigner::verify(id, expires, signature)
+   │  2. if runtime.signed_urls and query present → AssetSigner::verify(id, expires, signature)
    │        false → 403 InvalidSignatureException
    │  3. resolve id → compiled path → AssetRegistry (registry-only; throws 404 if unknown)
    │  4. validate file exists (stream/public driver)
@@ -306,7 +306,7 @@ Guard rails that make traversal structurally impossible:
 | Input | Only the opaque ID + optional `expires`/`signature`. Everything else ignored. |
 | Registry | Exclusive channel between ID and compiled path. No `..`, no absolute paths accepted when loading registry. |
 | Filesystem | Compiled paths resolved relative to a locked `public/build` root; canonicalized; escape → 404. |
-| Delivery | Safer default `PublicFileDriver`; `StreamDriver` for flexibility; both never execute files. |
+| Delivery | Safer default `PublicDriver`; `StreamDriver` for flexibility; both never execute files. |
 | Headers | `X-Content-Type-Options: nosniff`; correct Content-Type; never `*,` wildcard CORS unless explicitly enabled. |
 | Cache | Immutable: `public, max-age=31536000, immutable` for unsigned immutable assets; configurable for signed/expiring. |
 | Secrets | Only in server config/env. Never in HTML, JS, regressions, logs. |
@@ -405,7 +405,7 @@ interface AssetDeliveryDriver
 
 | Driver | Behavior | When to use |
 |---|---|---|
-| `PublicFileDriver` | Reads the resolved file within `public/build`, streams with headers | Default; simplest, PHP whitelist friendly |
+| `PublicDriver` | Reads the resolved file within `public/build`, streams with headers | Default; simplest, PHP whitelist friendly |
 | `StreamDriver` | `fpassthru`-style streaming with lazy open, supports range/conditional | Larger media or future CDN origination |
 | *(future)* `NginxXAccelDriver` | `X-Accel-Redirect` header; PHP never sends bytes | Defined, not implemented (MVP non-goal) |
 | *(future)* `S3Driver` / `R2Driver` / `CdnDriver` | Presigned/CDN redirect | Defined, not implemented (MVP non-goal) |
@@ -496,7 +496,7 @@ Composer package: **no** full-framework requirement; only `illuminate/*` pieces 
 
 - Registry persistence path — `storage/asset-shield/registry.json` (default), config override supported,
   kept outside `public/` (server-loads via `AssetRegistry::fromConfig`).
-- Default driver — `PublicFileDriver` (whitelist-friendly production); configurable via
-  `asset-shield.driver`; `StreamDriver` for readfile-based passthrough.
-- Signature default — all `/assets` URLs are signed when `signature.enabled=true`; `signed: false`
+- Default driver — `PublicDriver` (whitelist-friendly production); configurable via
+  `asset-shield.delivery.driver`; `StreamDriver` for readfile-based passthrough.
+- Signature default — all `/assets` URLs are signed when `runtime.signed_urls=true`; `signed: false`
   on `AssetShield::url()`/`@shieldVite()` opts out per call; default signs.

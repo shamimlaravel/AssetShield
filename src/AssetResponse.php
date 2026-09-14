@@ -1,6 +1,6 @@
 <?php
 
-namespace Vendor\AssetShield;
+namespace Shamimstack\AssetShield;
 
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -22,7 +22,7 @@ class AssetResponse
     }
 
     /**
-     * In-memory content response (used by PublicFileDriver).
+     * In-memory content response (used by PublicDriver).
      */
     public function fromContents(
         string $contents,

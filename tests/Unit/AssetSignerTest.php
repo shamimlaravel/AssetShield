@@ -1,6 +1,6 @@
 <?php
 
-use Vendor\AssetShield\Signer\HmacAssetSigner;
+use Shamimstack\AssetShield\Signer\HmacAssetSigner;
 
 function signer(string $secret = 'test-secret'): HmacAssetSigner
 {

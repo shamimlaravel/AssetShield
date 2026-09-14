@@ -1,11 +1,11 @@
 <?php
 
-namespace Vendor\AssetShield;
+namespace Shamimstack\AssetShield;
 
 use Illuminate\Contracts\Foundation\Application;
-use Vendor\AssetShield\Exceptions\AssetNotFoundException;
-use Vendor\AssetShield\Exceptions\ManifestNotFoundException;
-use Vendor\AssetShield\Support\OpaqueId;
+use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
+use Shamimstack\AssetShield\Exceptions\ManifestNotFoundException;
+use Shamimstack\AssetShield\Support\OpaqueId;
 
 /**
  * Reads the Laravel/Vite production manifest (public/build/manifest.json),
@@ -23,18 +23,21 @@ class AssetManifest
     public function __construct(
         private readonly string $path,
         private readonly Application $app,
+        private readonly ?string $outDir = null,
     ) {
     }
 
     public static function fromConfig(Application $app): self
     {
-        $path = (string) $app['config']->get('asset-shield.manifest_path', 'public/build/manifest.json');
+        $path = (string) $app['config']->get('asset-shield.build.manifest', 'public/build/manifest.json');
 
         if (! self::isAbsolute($path)) {
             $path = $app->basePath($path);
         }
 
-        return new self($path, $app);
+        $outDir = (string) $app['config']->get('asset-shield.build.out_dir', '');
+
+        return new self($path, $app, $outDir === '' ? null : $outDir);
     }
 
     public function path(): string
@@ -127,9 +130,17 @@ class AssetManifest
     /**
      * Convert a manifest-relative file (e.g. "assets/app-A91Kx.js") into the
      * compiled path relative to the public root ("build/assets/app-A91Kx.js").
+     * Uses `build.out_dir` when configured, otherwise the manifest directory.
      */
     public function compiledPath(string $manifestFile): string
     {
+        if ($this->outDir !== null) {
+            $rel = OpaqueId::canonicalize($this->outDir);
+            $file = OpaqueId::canonicalize($manifestFile);
+
+            return $rel === '' ? $file : $rel.'/'.$file;
+        }
+
         $rel = $this->publicRelDir();
         $file = OpaqueId::canonicalize($manifestFile);
 

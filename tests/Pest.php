@@ -1,5 +1,5 @@
 <?php
 
-use Vendor\AssetShield\Tests\TestCase;
+use Shamimstack\AssetShield\Tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);

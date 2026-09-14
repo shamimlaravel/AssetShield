@@ -39,7 +39,7 @@ it('@shieldVite skips unregistered entries', function () {
 });
 
 it('escapes attribute values in rendered tags', function () {
-    config()->set('asset-shield.signature.enabled', false);
+    config()->set('asset-shield.runtime.signed_urls', false);
     $this->reloadAssetShield();
     $this->bootstrapRegistry();
 

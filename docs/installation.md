@@ -7,7 +7,7 @@ assets. It assumes Laravel's Vite setup is already working (`npm run build` prod
 ## 1. Install the Composer package
 
 ```bash
-composer require vendor/asset-shield
+composer require shamimstack/asset-shield
 ```
 
 Laravel package discovery registers `AssetShieldServiceProvider` automatically. For package
@@ -26,20 +26,20 @@ php artisan asset-shield:install
 This command:
 
 - publishes `config/asset-shield.php`
-- creates the storage path used by the registry (`storage/asset-shield/`)
+- creates the storage path used by the registry and legend (`storage/app/assetshield/`)
 - prints the required Vite integration step
 - never overwrites an existing config file without confirmation
 
 If you prefer to publish manually:
 
 ```bash
-php artisan vendor:publish --provider="Vendor\AssetShield\AssetShieldServiceProvider"
+php artisan vendor:publish --provider="Shamimstack\AssetShield\AssetShieldServiceProvider"
 ```
 
 ## 3. Install the Vite plugin
 
 ```bash
-npm install --save-dev @vendor/asset-shield
+npm install --save-dev @asset-shield/vite-plugin
 ```
 
 Add the plugin to your `vite.config.js` (or `.ts`):
@@ -47,7 +47,7 @@ Add the plugin to your `vite.config.js` (or `.ts`):
 ```js
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
-import { assetShieldVite } from '@vendor/asset-shield';
+import { assetShieldVite } from '@asset-shield/vite-plugin';
 
 export default defineConfig({
     plugins: [
@@ -99,14 +99,19 @@ Expected (slightly abbreviated):
 ```
 AssetShield
 -----------
-Enabled: yes
-Mode: protected
-Manifest: found
-Registry: valid
-Signed URLs: enabled
-Expiration: 300s
-Obfuscation: disabled
-Source Maps: disabled
+  Enabled:            yes
+  Environment:        production
+  Runtime delivery:   no
+  Route prefix:       assets
+  Manifest:           found
+  Registry:           valid
+  Signed URLs:        yes
+  Expiration:         300s
+  Masking:            disabled
+  Obfuscation:        disabled
+    . engine:         not found
+  Source Maps:        no
+  Driver:             public
 ```
 
 You can now open the page, view source, and confirm scripts load from

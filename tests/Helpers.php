@@ -1,7 +1,7 @@
 <?php
 
-use Vendor\AssetShield\AssetRegistry;
-use Vendor\AssetShield\Signer\AssetSigner;
+use Shamimstack\AssetShield\AssetRegistry;
+use Shamimstack\AssetShield\Signer\AssetSigner;
 
 function opaqueFor(string $logical): string
 {

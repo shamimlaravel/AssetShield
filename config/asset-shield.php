@@ -7,9 +7,9 @@ return [
     | Master switch
     |--------------------------------------------------------------------------
     |
-    | When `false`, AssetShield routes, URL rewriting and asset delivery are all
-    | disabled. Plain Laravel Vite (`@vite()`) is completely unaffected, so this
-    | gives you a one-line rollback.
+    | When `false`, AssetShield URL generation, tags, routes and runtime
+    | delivery are all disabled. Plain Laravel Vite (`@vite()`) is completely
+    | unaffected, so this is a one-line rollback.
     |
     */
 
@@ -17,42 +17,71 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Mode
+    | Environment
     |--------------------------------------------------------------------------
     |
-    | 'protected' (default) serves assets via opaque IDs through the protected
-    | route. Future releases may add a passthrough 'public' mode.
+    | Which environment this build targets. Obfuscation and source-map warnings
+    | default to their safest production behaviour, so verify this reflects the
+    | environment the package runs in.
     |
     */
 
-    'mode' => env('ASSET_SHIELD_MODE', 'protected'),
+    'environment' => env('ASSET_SHIELD_ENV', env('APP_ENV', 'production')),
 
     /*
     |--------------------------------------------------------------------------
-    | Route prefix
+    | Build artifacts
     |--------------------------------------------------------------------------
     |
-    | Protected URLs have the shape /{route_prefix}/{opaque-id}, e.g.
-    | /assets/7f92a8c1.
+    | out_dir      Directory (relative to the public root) where Vite writes the
+    |              built assets — used to resolve compiled files from the registry.
+    | manifest     Vite manifest location (relative to the Laravel base path).
+    | registry     AssetShield registry (must stay outside public/).
+    | source_maps  Whether hostable source maps are produced. Defaults to false;
+    |              when enabled a prominent warning is logged. Never "hidden".
     |
     */
 
-    'route_prefix' => env('ASSET_SHIELD_ROUTE_PREFIX', 'assets'),
+    'build' => [
+        'out_dir' => env('ASSET_SHIELD_BUILD_OUT_DIR', 'build'),
+        'manifest' => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
+        'registry' => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/assetshield/registry.json'),
+        'source_maps' => env('ASSET_SHIELD_SOURCE_MAPS', false),
+    ],
 
     /*
     |--------------------------------------------------------------------------
-    | Signed URL behaviour
+    | Masking (deterministic build-time filename renaming)
     |--------------------------------------------------------------------------
     |
-    | enabled: when true, every emitted URL is HMAC-signed and the controller
-    |          verifies it before serving bytes.
-    | expires: default lifetime for signed URLs, in seconds.
+    | enabled   When true the Vite plugin renames entry/shared/dynamic/CSS
+    |           output files deterministically (codename or nameless hashes).
+    | strategy  'codename' (dictionary words), 'nameless' (hashes),
+    |           'preserve' (keep Vite names; explicit per-asset aliases still
+    |           apply).
+    | seed      Deterministic seed for the name generator. Empty falls back to
+    |           the application key so outputs differ between applications.
+    | aliases   Explicit logical -> filename overrides (with collision checks).
+    | include/  Globs constraining which files participate in masking.
+    | exclude   Files outside them keep their Vite names.
+    | dictionary Shared codename wordlist theme for generator lookups.
+    | legend    Secret legend mapping logical -> { original, masked }.
+    |           MUST stay outside public/ (never routed, never served).
+    |
+    | Masking names are deterministic and presentational; they are NOT
+    | encryption and must not be mistaken for a security boundary.
     |
     */
 
-    'signature' => [
-        'enabled' => true,
-        'expires' => env('ASSET_SHIELD_SIGNATURE_EXPIRES', 300),
+    'mask' => [
+        'enabled' => env('ASSET_SHIELD_MASK', false),
+        'strategy' => env('ASSET_SHIELD_MASK_STRATEGY', 'preserve'),
+        'seed' => env('ASSET_SHIELD_MASK_SEED', ''),
+        'aliases' => [],
+        'include' => [],
+        'exclude' => [],
+        'dictionary' => env('ASSET_SHIELD_MASK_DICTIONARY', 'default'),
+        'legend' => env('ASSET_SHIELD_LEGEND_PATH', 'app/assetshield/legend.json'),
     ],
 
     /*
@@ -62,42 +91,84 @@ return [
     |
     | These keys mirror what the Vite plugin reads from its own options. They
     | are informational for the PHP side (`asset-shield:status` / `:doctor`)
-    | and are disabled by default. Obfuscation is NOT encryption.
+    | and are disabled by default. Obfuscation is NOT encryption: it raises the
+    | cost of reverse engineering but cannot make client-delivered code
+    | un-inspectable.
     |
     */
 
     'obfuscation' => [
         'enabled' => env('ASSET_SHIELD_OBFUSCATION', false),
-        'preset' => 'balanced',
-        'engine' => 'javascript-obfuscator',
+        'preset' => env('ASSET_SHIELD_OBFUSCATION_PRESET', 'balanced'),
+        'engine' => env('ASSET_SHIELD_OBFUSCATION_ENGINE', 'javascript-obfuscator'),
+        'exclude_vendor' => env('ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR', true),
+        'node_binary' => env('ASSET_SHIELD_OBFUSCATION_NODE', 'node'),
+        'package_path' => env('ASSET_SHIELD_OBFUSCATION_PACKAGE', ''),
+        'timeout' => (float) env('ASSET_SHIELD_OBFUSCATION_TIMEOUT', 120.0),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Source maps
+    | Security headers / CSP
     |--------------------------------------------------------------------------
     |
-    | Production default is FALSE. When intentionally enabled, a prominent
-    | warning is logged. Hosted source maps are never "hidden".
+    | csp            When true, protected asset responses also carry an explicit,
+    |               strict Content-Security-Policy (binary content needs none of
+    |               the allowances a page does). Off by default.
+    | csp_allowlist  Page-level source allowlists consumed by
+    |               AssetShield::cspHeader(): keys script/style/img, each a list
+    |               of extra hosts (e.g. ['https://fonts.gstatic.com']). They add
+    |               sources; they never weaken the strict defaults by themselves.
     |
     */
 
-    'source_maps' => env('ASSET_SHIELD_SOURCE_MAPS', false),
+    'security' => [
+        'csp' => env('ASSET_SHIELD_CSP', false),
+        'allowlist' => [
+            'script' => [],
+            'style' => [],
+            'img' => [],
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
-    | Hotlink protection
+    | Runtime delivery (opt-in)
     |--------------------------------------------------------------------------
     |
-    | Off by default: correct referer/host gating depends on your upstream
-    | (proxy, CDN). Enable only with an explicit allow-list of upstream hosts.
+    | When `runtime.enabled` is false (default) AssetShield resolves asset URLs
+    | straight to the public build directory, letting the web server serve them
+    | at full speed. When enabled, assets are served through the protected
+    | route as opaque IDs.
+    |
+    | route_prefix  URL prefix for protected assets, e.g. /assets/as_...
+    | signed_urls   HMAC-sign every emitted protected URL and verify it before
+    |               serving bytes.
+    | expires       Default signed URL lifetime, in seconds.
     |
     */
 
-    'hotlink_protection' => env('ASSET_SHIELD_HOTLINK_PROTECTION', false),
+    'runtime' => [
+        'enabled' => env('ASSET_SHIELD_RUNTIME', false),
+        'route_prefix' => env('ASSET_SHIELD_ROUTE_PREFIX', 'assets'),
+        'signed_urls' => env('ASSET_SHIELD_SIGNED_URLS', true),
+        'expires' => env('ASSET_SHIELD_SIGNATURE_EXPIRES', 300),
+    ],
 
-    'hotlink' => [
-        'hosts' => [],
+    /*
+    |--------------------------------------------------------------------------
+    | Delivery
+    |--------------------------------------------------------------------------
+    |
+    | driver  'stream'  -> StreamDriver (Symfony BinaryFileResponse, Range
+    |                      support, ideal for large media / CDN origination).
+    |         'public'  -> PublicDriver (default, keeps PHP safe from path or
+    |                      traversal issues and stays web-server friendly).
+    |
+    */
+
+    'delivery' => [
+        'driver' => env('ASSET_SHIELD_DRIVER', 'public'),
     ],
 
     /*
@@ -116,31 +187,5 @@ return [
         'enabled' => true,
         'max_age' => env('ASSET_SHIELD_CACHE_MAX_AGE', 31536000),
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Paths
-    |--------------------------------------------------------------------------
-    |
-    | manifest_path   Vite manifest (relative to the Laravel base path).
-    | registry_path   AssetShield registry (must stay outside public/).
-    |
-    */
-
-    'manifest_path' => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
-
-    'registry_path' => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/asset-shield/registry.json'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Delivery driver
-    |--------------------------------------------------------------------------
-    |
-    | 'public'  -> PublicFileDriver (default, PHP whitelist friendly)
-    | 'stream'  -> StreamDriver (Symfony BinaryFileResponse, range support)
-    |
-    */
-
-    'driver' => env('ASSET_SHIELD_DRIVER', 'public'),
 
 ];

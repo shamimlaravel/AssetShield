@@ -1,7 +1,10 @@
 <?php
 
+use Shamimstack\AssetShield\AssetRegistry;
+use Shamimstack\AssetShield\Tests\TestCase;
+
 it('builds the registry from the manifest', function () {
-    $registryFile = \Vendor\AssetShield\Tests\TestCase::FIXTURES.'/storage/asset-shield/registry.json';
+    $registryFile = TestCase::REGISTRY_FILE;
     @unlink($registryFile);
 
     $this->artisan('asset-shield:build')
@@ -9,19 +12,19 @@ it('builds the registry from the manifest', function () {
 
     expect(file_exists($registryFile))->toBeTrue();
 
-    $registry = app(\Vendor\AssetShield\AssetRegistry::class);
+    $registry = app(AssetRegistry::class);
     $registry->refresh();
     $opaque = $registry->opaqueForLogical('resources/js/app.js');
 
-    expect($opaque)->toMatch('/^[a-f0-9]{16}$/')
-        ->and($registry->compiledForOpaque($opaque))->toBe('build/assets/app-A91Kx.js');
+    expect($opaque)->toMatch('/^as_[a-f0-9]{16}$/')
+        ->and($registry->fileForOpaque($opaque))->toBe('build/assets/app-A91Kx.js');
 });
 
 it('fails the build when the manifest is missing', function () {
     $tmp = storage_path('no-manifest-here.json');
     @unlink($tmp);
 
-    config()->set('asset-shield.manifest_path', $tmp);
+    config()->set('asset-shield.build.manifest', $tmp);
     $this->reloadAssetShield();
 
     $this->artisan('asset-shield:build')
@@ -33,7 +36,7 @@ it('prints a status report', function () {
     $exitCode = $kernel->call('asset-shield:status');
 
     expect($exitCode)->toBe(0)
-        ->and($kernel->output())->toContain('AssetShield', 'Enabled:', 'yes', 'protected', 'valid');
+        ->and($kernel->output())->toContain('AssetShield', 'Enabled:', 'yes', 'valid');
 });
 
 it('prints status as json', function () {
@@ -54,14 +57,14 @@ it('doctor passes for a healthy environment', function () {
 });
 
 it('doctor fails when the registry is missing', function () {
-    @unlink(\Vendor\AssetShield\Tests\TestCase::FIXTURES.'/storage/asset-shield/registry.json');
+    @unlink(TestCase::REGISTRY_FILE);
 
     $this->artisan('asset-shield:doctor')
         ->assertExitCode(1);
 });
 
 it('doctor fails when source maps are enabled', function () {
-    config()->set('asset-shield.source_maps', true);
+    config()->set('asset-shield.build.source_maps', true);
     $this->reloadAssetShield();
 
     $this->artisan('asset-shield:doctor')
@@ -74,7 +77,7 @@ it('install publishes config and creates storage', function () {
     $this->artisan('asset-shield:install', ['--force' => true])
         ->assertExitCode(0);
 
-    expect(is_dir(storage_path('asset-shield')))->toBeTrue();
+    expect(is_dir(storage_path('app/assetshield')))->toBeTrue();
 
     if (file_exists($target)) {
         @unlink($target);

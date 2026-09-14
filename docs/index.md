@@ -14,7 +14,7 @@ honestly and securely.
 | [Installation](installation.md) | How-to | Composer + npm install, provider auto-discovery, first build |
 | [Configuration](configuration.md) | Reference | Every config key, env var, and default |
 | [Usage](usage.md) | How-to | Blade directives, PHP API, `@shieldVite`, resolving and emitting assets |
-| [Vite integration](vite.md) | How-to | The `@vendor/asset-shield` plugin, obfuscation presets, vendor rules |
+| [Vite integration](vite.md) | How-to | The `@asset-shield/vite-plugin` plugin, masking, obfuscation presets, vendor rules |
 | [Signed URLs](signed-urls.md) | How-to | HMAC signing, expiration, verification, direct `AssetSigner` use |
 | [Security model](security.md) | Explanation | Threat model, what is and isn't protected, honest limits |
 | [Production deployment](deployment.md) | How-to | `asset-shield:doctor`, builds, Nginx, CDN, cache behavior |
@@ -64,9 +64,9 @@ honestly and securely.
 
 - Version: 0.1.0 (MVP)
 - [CHANGELOG](../CHANGELOG.md)
-- [PRD](../PRD.md) · [TRD](../TRD.md)
+- [PRD](./PRD.md) · [TRD](./TRD.md)
 
 ## Related reading
 
-- [PRD — Product Requirements](../PRD.md)
-- [TRD — Technical Requirements & Design](../TRD.md)
+- [PRD — Product Requirements](./PRD.md)
+- [TRD — Technical Requirements & Design](./TRD.md)

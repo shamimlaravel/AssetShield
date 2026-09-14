@@ -1,25 +1,30 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Vendor\AssetShield\Http\Controllers\AssetController;
-use Vendor\AssetShield\Http\Middleware\AssetSecurityHeaders;
+use Shamimstack\AssetShield\Http\Controllers\AssetController;
+use Shamimstack\AssetShield\Http\Middleware\AssetSecurityHeaders;
+use Shamimstack\AssetShield\Http\Middleware\VerifyAssetSignature;
 
 /*
 |--------------------------------------------------------------------------
-| Protected asset delivery
+| Protected asset delivery (runtime delivery, opt-in)
 |--------------------------------------------------------------------------
 |
-| The {asset} segment is constrained to hex opaque ids ([a-f0-9]{8,32}) so a
+| Loaded only when AssetShield is enabled AND runtime delivery is on:
+|
+|   GET /{route_prefix}/{opaque-id}[?expires=&signature=]
+|
+| The {asset} segment is constrained to AssetShield opaque ids (as_...hex) so a
 | filesystem path can never be matched against this route. Resolution happens
-| exclusively through the AssetRegistry.
+| exclusively through the registry; VerifyAssetSignature gates 404/403.
 |
 */
 
-Route::middleware([AssetSecurityHeaders::class])
-    ->prefix((string) config('asset-shield.route_prefix', 'assets'))
+Route::middleware([AssetSecurityHeaders::class, VerifyAssetSignature::class])
+    ->prefix((string) config('asset-shield.runtime.route_prefix', 'assets'))
     ->name('asset-shield.')
     ->group(function (): void {
         Route::get('/{asset}', AssetController::class)
-            ->where('asset', '[a-f0-9]{8,32}')
+            ->where('asset', '[a-z0-9_]{2,64}')
             ->name('show');
     });

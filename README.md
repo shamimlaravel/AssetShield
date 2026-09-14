@@ -20,7 +20,7 @@ reverse engineering.
 | Cache + security headers | `immutable` caching, correct MIME, `nosniff`, no wildcard CORS |
 | Optional JS obfuscation | `light` / `balanced` / `aggressive`, **off by default**, vendor chunks skipped |
 | Vite compatibility | Uses your existing `@vite()` manifest and pipeline — nothing replaced |
-| Delivery drivers | `PublicFileDriver` / `StreamDriver` now; Nginx/S3/R2/CDN ready later |
+| Delivery drivers | `PublicDriver` / `StreamDriver` now; Nginx/S3/R2/CDN ready later |
 | Diagnostics | `asset-shield:doctor`, `:status`, `:build`, `:install` |
 
 **What it cannot do** (and never claims to): hide browser-delivered code, encrypt JavaScript,
@@ -36,8 +36,8 @@ block DevTools, or act as DRM. See the [honest security model](docs/security.md)
 ## Installation
 
 ```bash
-composer require vendor/asset-shield
-npm install --save-dev @vendor/asset-shield
+composer require shamimstack/asset-shield
+npm install --save-dev @asset-shield/vite-plugin
 ```
 
 ```bash
@@ -47,7 +47,7 @@ php artisan asset-shield:install      # publish config, create paths, show Vite 
 Add the plugin to `vite.config.js`:
 
 ```js
-import { assetShieldVite } from '@vendor/asset-shield';
+import { assetShieldVite } from '@asset-shield/vite-plugin';
 
 export default defineConfig({
     plugins: [
@@ -88,12 +88,19 @@ See [docs/configuration.md](docs/configuration.md) for the full reference. Highl
 
 ```php
 'enabled'    => env('ASSET_SHIELD_ENABLED', true),
-'mode'       => env('ASSET_SHIELD_MODE', 'protected'),
-'route_prefix' => env('ASSET_SHIELD_ROUTE_PREFIX', 'assets'),
-'signature'  => ['enabled' => true, 'expires' => 300],
-'obfuscation'=> ['enabled' => false, 'preset' => 'balanced', 'engine' => 'javascript-obfuscator'],
-'source_maps'=> false,
+'environment'=> env('ASSET_SHIELD_ENV', env('APP_ENV', 'production')),
+'build'      => [
+    'out_dir'     => 'build',
+    'manifest'    => 'public/build/manifest.json',
+    'registry'    => 'storage/app/assetshield/registry.json',
+    'source_maps' => false,
+],
+'mask' => ['enabled' => false, 'strategy' => 'preserve', 'seed' => '', 'legend' => 'app/assetshield/legend.json'],
+'obfuscation'=> ['enabled' => false, 'preset' => 'balanced', 'engine' => 'javascript-obfuscator', 'exclude_vendor' => true],
+'runtime'    => ['enabled' => false, 'route_prefix' => 'assets', 'signed_urls' => true, 'expires' => 300],
+'delivery'   => ['driver' => 'public'],
 'cache'      => ['enabled' => true, 'max_age' => 31536000],
+'security'   => ['csp' => false, 'allowlist' => ['script' => [], 'style' => [], 'img' => []]],
 ```
 
 ## Documentation
@@ -108,7 +115,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference. Highl
 - [Testing](docs/testing.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
-Companion specs: [PRD](PRD.md) · [TRD](TRD.md)
+Companion specs: [PRD](docs/PRD.md) · [TRD](docs/TRD.md)
 
 ## Testing
 
@@ -122,7 +129,7 @@ npm test          # Vitest for the Vite plugin
 | Command | Purpose |
 |---|---|
 | `asset-shield:install` | Publish config, create directories, show Vite setup |
-| `asset-shield:build` | Validate manifest + regenerate/validate the registry |
+| `asset-shield:build` | Validate manifest + regenerate/validate the registry (`--run` also runs `npm run build`) |
 | `asset-shield:status` | Print configuration snapshot |
 | `asset-shield:doctor` | Environment/security health check (pre-deploy) |
 
@@ -142,7 +149,8 @@ must stay outside `public/`; `APP_DEBUG=false`; immutable IDs + cache headers me
 ## Security model — the honest summary
 
 1. Server-side source files are kept out of the web root and are never requestable via AssetShield.
-2. Protected URLs are opaque and key-derived — no filenames, no structure leakage.
+2. Protected URLs are opaque and key-derived — no filenames, no structure leakage; optional
+   build-time masking strips framework fingerprints from served filenames too.
 3. Signed URLs expire; forging/expiry → **403** via constant-time HMAC verification.
 4. Files are resolved only through the AssetRegistry — path traversal, `.env`, storage/vendor
    reads are structurally impossible.
@@ -152,4 +160,4 @@ must stay outside `public/`; `APP_DEBUG=false`; immutable IDs + cache headers me
 
 - **Version:** 0.1.0 (MVP) · [CHANGELOG](CHANGELOG.md)
 - **License:** MIT (see [LICENSE](LICENSE))
-- Package names `vendor/asset-shield` / `@vendor/asset-shield` are placeholders for publication.
+- Composer package: `shamimstack/asset-shield` · Vite plugin: `@asset-shield/vite-plugin`

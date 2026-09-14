@@ -6,6 +6,30 @@ All notable changes to AssetShield are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Masking** (PHP + plugin, deterministic build-time filename renaming) — `nameless`/`codename`/
+  `preserve` strategies, logical aliases, include/exclude globs, cross-side seed parity, and a secret
+  **legend** artifact (`storage/app/assetshield/legend.json`) mapping every pre-mask → masked name.
+  Names are presentational, not cryptographic; documented honestly.
+- **Registry v2** — plugin & server both write/consume `{version, built_at, assets:{logical}}` with
+  optional `original` (pre-mask) and `integrity` fields; `buildLegend`/`writeLegend` helpers.
+- **`asset-shield:build --run`** — runs `npm run build` via a subprocess, then regenerates the
+  registry from manifest + legend.
+- **Doctor checks 9–12** — mask legend consistency (seed mismatch fails fast), duplicate output
+  filenames, broken manifest file references, toolchain versions (PHP/Node/NPM); new `info` display
+  state.
+- **CSP & security headers** — `Security\Csp` policy builder, `AssetShield::cspNonce()` /
+  `cspHeader()`, optional strict `Content-Security-Policy` on protected asset responses
+  (`security.csp`), page-level allowlists without `'unsafe-inline'`.
+- **PHP obfuscation adapter** — `Obfuscation\ObfuscationEngine` + `JavascriptObfuscator` (drives the
+  `javascript-obfuscator` package through Node; presets; vendor exclusions honored plugin-side);
+  engine availability surfaced by `asset-shield:status`.
+- **Plugin hardening** — Windows `isAbsolute` fix, output-naming-hook mask wrapping with a
+  deterministic pattern hash (with loud caching warning), legend write + "never serve" guards.
+- **E2E smoke** (`npm run test:e2e`) — real Vite build with mask + manifest bridge asserting
+  registry v2, legend round-trip, deterministic name parity, and zero source maps.
+
 ### Planned (post-MVP)
 
 - Delivery drivers: Nginx `X-Accel-Redirect`, Apache `X-Sendfile`, S3, Cloudflare R2, CDN signing.
@@ -30,7 +54,7 @@ All notable changes to AssetShield are documented here. Format follows
   forged signatures rejected with 403.
 - **AssetController** — registry-only resolution, signature validation, MIME mapping, security and
   cache headers; path traversal / `.env` / vendor reads structurally impossible.
-- **Delivery drivers** — `AssetDeliveryDriver` interface with `PublicFileDriver` and `StreamDriver`;
+- **Delivery drivers** — `AssetDeliveryDriver` interface with `PublicDriver` and `StreamDriver`;
   architecture reserved for Nginx/S3/R2/CDN drivers.
 - **Blade directives** — `@assetShield`, `@assetShieldCss`, `@assetShieldJs`, `@shieldVite`.
 - **Vite plugin** (TypeScript) — production-only activation, registry generation, optional JS

@@ -37,8 +37,11 @@ three layers:
 
 ### 2. URL abstraction
 
-Users see `/assets/7f92a8c1`, never `/build/assets/app-A91Kx.js`. Filenames like `app-A91Kx.js`
-don't leak build structure, framework fingerprints, or module boundaries through the URL.
+Users see `/assets/7f92a8c1`, never `/build/assets/app-A91Kx.js`, and with optional *masking* they
+no longer even see `app-A91Kx.js` — build-time filename renaming (`nameless` hashes or `codename`
+words) removes framework fingerprints and module boundaries from every served filename. Masking is
+**presentational, not cryptographic**; it pairs with the opaque-URL scheme, it does not replace it.
+Both are keyed to the deployment and both rotate with `APP_KEY`.
 
 ### 3. Access control & expiration
 
@@ -83,7 +86,50 @@ Even when they exist on disk, the controller rejects them.
 | `X-Content-Type-Options` | `nosniff` | Prevent MIME-sniffing downgrades |
 | `Content-Type` | Correct type per extension | JS/CSS/SVG/JSON/fonts/images |
 | `Cache-Control` | `public, max-age=31536000, immutable` (unsigned) | Long-lived for build artifacts |
+| `Content-Security-Policy` | strict `default-src 'none'` (assets) / page policy (via CSP helper) | On by default for asset contract; page-level policy is opt-in |
 | `Access-Control-Allow-Origin` | **never** `*` unless explicitly configured | No wildcard CORS |
+
+With `asset-shield.security.csp=true`, every protected asset response also carries an explicit,
+strict `Content-Security-Policy` (`default-src 'none'` — binary content needs no inline allowances).
+
+## CSP helper for your own pages
+
+For page HTML, use the facade to emit an identical, strict policy plus a fresh per-request nonce:
+
+```php
+// App\Http\Middleware\ApplyContentSecurityPolicy
+public function handle($request, Closure $next)
+{
+    $response = $next($request);
+    $response->headers->set('Content-Security-Policy', \Shamimstack\AssetShield\Facades\AssetShield::cspHeader());
+    return $response;
+}
+```
+
+```blade
+<script nonce="{{ \Shamimstack\AssetShield\Facades\AssetShield::cspNonce() }}">
+    window.App ??= {};
+</script>
+<script src="{{ asset('js/app.js') }}" nonce="{{ \Shamimstack\AssetShield\Facades\AssetShield::cspNonce() }}"></script>
+```
+
+- The nonce is stable within one request (one CSP value, one nonce) and recycled every request.
+- A CSP nonce is **not a secret** — it is delivered to clients. Only its per-request uniqueness and
+  the fact that untrusted content cannot predict it are what make it useful.
+- Extend `default-src`/`script-src` with `asset-shield.security.allowlist` entries rather than
+  `'unsafe-inline'`; the helper never emits `'unsafe-inline'` on its own.
+
+## The masking legend
+
+The legend (default `storage/app/assetshield/legend.json`) is the one AssetShield artifact that
+reconstructs the original (pre-mask) names. Treat it as secret:
+
+- Keep it out of `public/` (AssetShield refuses to serve it) and out of public repository history.
+- A leaked legend alone does not expose code — but combined with the served assets it undoes
+  filename masking for the curious. It poses **no** similar risk to the protected runtime route,
+  which never depends on filename secrecy.
+- Missing legend ≠ failure: AssetShield degrades to manifest names and reports it in
+  `asset-shield:build` / `:doctor`.
 
 ## Production hard rules
 

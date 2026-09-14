@@ -1,6 +1,6 @@
 <?php
 
-namespace Vendor\AssetShield\Signer;
+namespace Shamimstack\AssetShield\Signer;
 
 /**
  * Contract for HMAC-based signing and verification of protected asset URLs.

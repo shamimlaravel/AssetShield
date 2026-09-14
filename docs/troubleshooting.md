@@ -113,14 +113,14 @@ Each warning's message states the concrete fix.
 | Symptom | Cause / fix |
 |---|---|
 | Browser never re-fetches new JS after deploy | New build → new opaque IDs; if you see 200 on old ID, its CDN key is stale → purge CDN or wait for immutable expiry (by design). |
-| Signed links 403 immediately | `expires` in the past (clock skew in the app generating vs. the client clock is irrelevant — server clock rules); too-short `signature.expires` default; NTP the app servers. |
+| Signed links 403 immediately | `expires` in the past (clock skew in the app generating vs. the client clock is irrelevant — server clock rules); too-short `runtime.expires` default; NTP the app servers. |
 | `Cache-Control` lacks `immutable` | You're serving a signed asset → clamped to remaining lifetime (expected). Unsigned immutable assets get `immutable`. |
 
 ---
 
 ## npm / composer install errors
 
-- `@vendor/asset-shield` requires Node ≥ 18 and Vite ≥ 5 — upgrade, or pin a compatible version.
+- `@asset-shield/vite-plugin` requires Node ≥ 18 and Vite ≥ 5 — upgrade, or pin a compatible version.
 - `javascript-obfuscator` is optional; if `npm install` complains, you don't need it unless
   obfuscation is enabled.
 - Composer: the package requires PHP ^8.3 and Laravel 13–compatible `illuminate/*`. On Laravel < 13,

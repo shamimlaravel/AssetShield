@@ -336,7 +336,7 @@
           <span class="terminal-badge">LIVE</span>
         </div>
         <div class="terminal-body" id="term-body">
-          <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">composer require vendor/asset-shield</span></div>
+          <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">composer require shamimstack/asset-shield</span></div>
           <div class="t-ln t-ok" data-ty="1">✔ package installed — provider discovered</div>
           <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm run build && php artisan asset-shield:build</span></div>
           <div class="t-ln t-ok" data-ty="2">✔ vite build ok · registry written · 12 assets</div>
@@ -509,7 +509,7 @@ public, max-age=<span class="g">31536000</span>, immutable
           <p>The controller verifies signatures, resolves through the registry, and hands bytes to a
             driver. Future-proofed for edge offload.</p>
           <div class="driver-row">
-            <span class="chip on">PublicFileDriver</span>
+            <span class="chip on">PublicDriver</span>
             <span class="chip on">StreamDriver</span>
             <span class="chip">X-Accel-Redirect</span>
             <span class="chip">X-Sendfile</span>
@@ -519,7 +519,7 @@ public, max-age=<span class="g">31536000</span>, immutable
           </div>
         </div>
       </div>
-      <p class="flow-note reveal">Artifacts in transit: <b>public/build/manifest.json</b> · <b>storage/asset-shield/registry.json</b></p>
+      <p class="flow-note reveal">Artifacts in transit: <b>public/build/manifest.json</b> · <b>storage/app/assetshield/registry.json</b></p>
     </div>
   </section>
 
@@ -635,12 +635,12 @@ public, max-age=<span class="g">31536000</span>, immutable
             <span class="terminal-title">quickstart</span>
           </div>
           <div class="terminal-body" style="min-height:0">
-            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">composer require vendor/asset-shield</span></div>
-            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm i -D @vendor/asset-shield</span></div>
+            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">composer require shamimstack/asset-shield</span></div>
+            <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm i -D @asset-shield/vite-plugin</span></div>
             <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">php artisan asset-shield:install</span></div>
             <div class="t-ln">&#160;</div>
             <div class="t-ln t-dim">// vite.config.js</div>
-            <div class="t-ln">import { <span class="t-ok">assetShieldVite</span> } from <span class="t-ok-cyan">'@vendor/asset-shield'</span>;</div>
+            <div class="t-ln">import { <span class="t-ok">assetShieldVite</span> } from <span class="t-ok-cyan">'@asset-shield/vite-plugin'</span>;</div>
             <div class="t-ln">plugins: [ laravel({<span class="t-dim"> input: […], refresh: true</span> }), <span class="t-ok">assetShieldVite()</span> ]</div>
             <div class="t-ln">&#160;</div>
             <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm run build && php artisan asset-shield:build</span></div>
@@ -736,7 +736,7 @@ public, max-age=<span class="g">31536000</span>, immutable
       </div>
     </div>
     <div class="foot-bottom">
-      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span class="t-ok">vendor/asset-shield</span> &middot; npm <span class="t-ok-cyan">@vendor/asset-shield</span></p>
+      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span class="t-ok">shamimstack/asset-shield</span> &middot; npm <span class="t-ok-cyan">@asset-shield/vite-plugin</span></p>
       <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
         exposure, protects asset access, and increases the cost of reverse engineering.</p>
     </div>

@@ -1,10 +1,9 @@
 <?php
 
-namespace Vendor\AssetShield;
+namespace Shamimstack\AssetShield;
 
-use Vendor\AssetShield\Exceptions\AssetNotFoundException;
-use Vendor\AssetShield\Signer\AssetSigner;
-use Vendor\AssetShield\Support\MimeMapper;
+use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
+use Shamimstack\AssetShield\Signer\AssetSigner;
 
 /**
  * Public surface of the package (facade accessor "asset-shield").
@@ -13,6 +12,11 @@ use Vendor\AssetShield\Support\MimeMapper;
  *   AssetShield::script('resources/js/app.js')
  *   AssetShield::style('resources/css/app.css')
  *   AssetShield::resolve('resources/js/app.js')
+ *
+ * URL behaviour:
+ *  - disabled:            plain `@vite()` fallback path (one-line rollback)
+ *  - runtime enabled:     protected `/assets/as_...` URLs (signed when on)
+ *  - runtime disabled:    plain public path, web server serves the file
  */
 class AssetShieldManager
 {
@@ -30,13 +34,18 @@ class AssetShieldManager
         return (bool) ($this->config['enabled'] ?? true);
     }
 
-    public function mode(): string
+    public function runtimeEnabled(): bool
     {
-        return (string) ($this->config['mode'] ?? 'protected');
+        return (bool) (($this->config['runtime'] ?? [])['enabled'] ?? false);
+    }
+
+    public function environment(): string
+    {
+        return (string) ($this->config['environment'] ?? 'production');
     }
 
     /**
-     * Resolved metadata for an entry (compiled, opaque, type, mime, url).
+     * Resolved metadata for an entry (file, opaque, type, mime, url).
      */
     public function resolve(string $entry): array
     {
@@ -51,22 +60,30 @@ class AssetShieldManager
         }
 
         return [
-            'compiled' => $record['compiled'],
+            'file' => $record['file'],
+            'original' => $record['original'],
             'opaque' => $record['opaque'],
             'type' => $record['type'],
             'integrity' => $record['integrity'],
-            'mime' => MimeMapper::forPath($record['compiled']),
+            'mime' => \Shamimstack\AssetShield\Support\MimeMapper::forPath($record['file']),
             'url' => $this->url($entry),
         ];
     }
 
     /**
-     * Protected URL for a logical entry. When AssetShield is disabled this
-     * falls back to the plain Vite/public URL so rollback stays one line.
+     * URL for a logical entry. When AssetShield is disabled this falls back to
+     * the plain Vite/public URL; when runtime delivery is off the web server
+     * serves the same public path directly.
      */
     public function url(string $entry, ?bool $signed = null, ?int $expires = null): string
     {
         if (! $this->isEnabled()) {
+            $record = $this->manifest->resolve($entry);
+
+            return '/'.$this->manifest->compiledPath($record['file']);
+        }
+
+        if (! $this->runtimeEnabled()) {
             $record = $this->manifest->resolve($entry);
 
             return '/'.$this->manifest->compiledPath($record['file']);
@@ -81,7 +98,16 @@ class AssetShieldManager
             return '';
         }
 
-        return '<script src="'.e($this->url($entry)).'"></script>';
+        $url = $this->url($entry);
+        $integrity = $this->integrityFor($entry);
+
+        $attributes = 'src="'.e($url).'"';
+
+        if ($integrity !== null) {
+            $attributes .= ' integrity="'.e($integrity).'" crossorigin="anonymous"';
+        }
+
+        return '<script '.$attributes.'></script>';
     }
 
     public function style(string $entry): string
@@ -90,7 +116,16 @@ class AssetShieldManager
             return '';
         }
 
-        return '<link rel="stylesheet" href="'.e($this->url($entry)).'">';
+        $url = $this->url($entry);
+        $integrity = $this->integrityFor($entry);
+
+        $attributes = 'rel="stylesheet" href="'.e($url).'"';
+
+        if ($integrity !== null) {
+            $attributes .= ' integrity="'.e($integrity).'" crossorigin="anonymous"';
+        }
+
+        return '<link '.$attributes.'>';
     }
 
     /**
@@ -108,7 +143,7 @@ class AssetShieldManager
             throw AssetNotFoundException::fromRegistryEntry($entry);
         }
 
-        return $record['type'] === 'style' ? $this->style($entry) : $this->script($entry);
+        return ($record['type'] ?? '') === 'style' ? $this->style($entry) : $this->script($entry);
     }
 
     /**
@@ -149,24 +184,31 @@ class AssetShieldManager
      */
     public function status(): array
     {
-        $signature = (array) ($this->config['signature'] ?? []);
+        $runtime = (array) ($this->config['runtime'] ?? []);
+        $build = (array) ($this->config['build'] ?? []);
+        $mask = (array) ($this->config['mask'] ?? []);
         $obfuscation = (array) ($this->config['obfuscation'] ?? []);
+        $delivery = (array) ($this->config['delivery'] ?? []);
 
         return [
             'enabled' => $this->isEnabled(),
-            'mode' => $this->mode(),
-            'route_prefix' => (string) ($this->config['route_prefix'] ?? 'assets'),
+            'environment' => $this->environment(),
+            'runtime_enabled' => $this->runtimeEnabled(),
+            'route_prefix' => (string) ($runtime['route_prefix'] ?? 'assets'),
             'manifest_found' => $this->manifest->exists(),
             'manifest_path' => $this->manifest->path(),
             'registry_found' => $this->registry->fileExists(),
             'registry_path' => $this->registry->path(),
             'registry_valid' => $this->registryValid(),
-            'signed_urls' => (bool) ($signature['enabled'] ?? false),
-            'expires' => (int) ($signature['expires'] ?? 300),
+            'signed_urls' => (bool) ($runtime['signed_urls'] ?? false),
+            'expires' => (int) ($runtime['expires'] ?? 300),
+            'mask_enabled' => (bool) ($mask['enabled'] ?? false),
+            'mask_strategy' => (string) ($mask['strategy'] ?? 'preserve'),
             'obfuscation_enabled' => (bool) ($obfuscation['enabled'] ?? false),
             'obfuscation_preset' => (string) ($obfuscation['preset'] ?? 'balanced'),
-            'source_maps' => (bool) ($this->config['source_maps'] ?? false),
-            'driver' => (string) ($this->config['driver'] ?? 'public'),
+            'obfuscation_exclude_vendor' => (bool) ($obfuscation['exclude_vendor'] ?? true),
+            'source_maps' => (bool) ($build['source_maps'] ?? false),
+            'driver' => (string) ($delivery['driver'] ?? 'public'),
             'cache_max_age' => (int) (($this->config['cache'] ?? [])['max_age'] ?? 31536000),
         ];
     }
@@ -184,6 +226,11 @@ class AssetShieldManager
     public function manifest(): AssetManifest
     {
         return $this->manifest;
+    }
+
+    private function integrityFor(string $entry): ?string
+    {
+        return $this->registry->entryForLogical($entry)['integrity'] ?? null;
     }
 
     private function registryValid(): bool

@@ -7,8 +7,8 @@
 | **Status** | MVP |
 | **Product** | AssetShield |
 | **Stack** | Laravel 13 · PHP 8.3+ · Vite ≥ 5 · Node ≥ 18 |
-| **Composer package** | `vendor/asset-shield` (placeholders) |
-| **NPM package** | `@vendor/asset-shield` (placeholders) |
+| **Composer package** | `shamimstack/asset-shield` |
+| **NPM package** | `@asset-shield/vite-plugin` |
 
 ---
 
@@ -108,7 +108,7 @@ problems.
 7. `AssetController` at `GET /assets/{asset}` — signatures → registry resolution → correct MIME →
    secure response via delivery drivers.
 8. Delivery driver architecture — `AssetDeliveryDriver` interface with MVP drivers
-   `PublicFileDriver` and `StreamDriver`.
+   `PublicDriver` and `StreamDriver`.
 9. Blade directives `@assetShield`, `@assetShieldCss`, `@assetShieldJs`, `@shieldVite`, and PHP API
    `AssetShield::url|script|style`.
 10. Vite plugin (`packages/vite-plugin`, TypeScript) — production-only, registry generation,
@@ -152,8 +152,8 @@ Requirements are numbered and referenced from the TRD (`FR-xx`) and test plan.
 
 ### 7.2 Configuration Surface
 
-- **FR-04** Default config matches the specification exactly (`enabled`, `mode`, `route_prefix`,
-  `signature.*`, `obfuscation.*`, `source_maps`, `hotlink_protection`, `cache.*`).
+- **FR-04** Default config matches the specification exactly (`enabled`, `environment`, `build.*`,
+  `mask.*`, `obfuscation.*`, `runtime.*`, `delivery.*`, `cache.*`, `security.*`).
 - **FR-05** No secrets are hard-coded; keys come from environment variables.
 
 ### 7.3 Manifest & Registry
@@ -181,7 +181,7 @@ Requirements are numbered and referenced from the TRD (`FR-xx`) and test plan.
   and streams the asset with a correct Content-Type.
 - **FR-14** Supported types: JS, CSS, SVG, JSON, fonts, common images (PNG/JPEG/WebP/GIF/ICO).
 - **FR-15** Files are never executed server-side.
-- **FR-16** Delivery flows through an `AssetDeliveryDriver` (MVP: `PublicFileDriver`, `StreamDriver`).
+- **FR-16** Delivery flows through an `AssetDeliveryDriver` (MVP: `PublicDriver`, `StreamDriver`).
 - **FR-17** No arbitrary filesystem path is ever accepted from any request input.
 
 ### 7.6 Blade & PHP API
@@ -223,8 +223,9 @@ Requirements are numbered and referenced from the TRD (`FR-xx`) and test plan.
   configuration, and never overwrites user files without confirmation.
 - **FR-32** `asset-shield:build` verifies Vite, verifies manifest, generates/updates the registry,
   validates all registered assets, and reports failures clearly (no silent errors).
-- **FR-33** `asset-shield:status` prints the status report (enabled, mode, manifest, registry,
-  signed URLs, expiration, obfuscation, source maps).
+- **FR-33** `asset-shield:status` prints the status report (enabled, environment, runtime delivery,
+  route prefix, manifest, registry, signed URLs, expiration, masking, obfuscation, source maps,
+  driver).
 - **FR-34** `asset-shield:doctor` inspects `APP_ENV`, `APP_DEBUG`, manifest, source maps,
   `node_modules` accessibility, `.env` location, Debugbar detection, and registry validity, with
   actionable output.
@@ -289,23 +290,40 @@ Requirements are numbered and referenced from the TRD (`FR-xx`) and test plan.
 ```php
 // config/asset-shield.php
 return [
-    'enabled'            => env('ASSET_SHIELD_ENABLED', true),
-    'mode'               => env('ASSET_SHIELD_MODE', 'protected'),
-    'route_prefix'       => env('ASSET_SHIELD_ROUTE_PREFIX', 'assets'),
+    'enabled'        => env('ASSET_SHIELD_ENABLED', true),
+    'environment'    => env('ASSET_SHIELD_ENV', env('APP_ENV', 'production')),
 
-    'signature' => [
-        'enabled' => true,
-        'expires' => 300,
+    'build' => [
+        'out_dir'     => 'build',
+        'manifest'    => 'public/build/manifest.json',
+        'registry'    => 'storage/app/assetshield/registry.json',
+        'source_maps' => false,
+    ],
+
+    'mask' => [
+        'enabled'  => false,
+        'strategy' => 'preserve',
+        'seed'     => '',
+        'legend'   => 'app/assetshield/legend.json',
     ],
 
     'obfuscation' => [
-        'enabled'  => false,
-        'preset'   => 'balanced',
-        'engine'   => 'javascript-obfuscator',
+        'enabled'        => false,
+        'preset'         => 'balanced',
+        'engine'         => 'javascript-obfuscator',
+        'exclude_vendor' => true,
     ],
 
-    'source_maps'        => false,
-    'hotlink_protection' => false,
+    'runtime' => [
+        'enabled'      => false,
+        'route_prefix' => env('ASSET_SHIELD_ROUTE_PREFIX', 'assets'),
+        'signed_urls'  => true,
+        'expires'      => 300,
+    ],
+
+    'delivery' => [
+        'driver' => 'public',
+    ],
 
     'cache' => [
         'enabled' => true,
@@ -321,16 +339,16 @@ return [
 ### 11.1 Composer
 
 ```
-composer require vendor/asset-shield
+composer require shamimstack/asset-shield
 ```
 
 - Laravel auto-discovery registers the provider.
-- Dev: `composer require --dev vendor/asset-shield` picks up testbench/pest (dev-only, package dev).
+- Dev: `composer require --dev shamimstack/asset-shield` picks up testbench/pest (dev-only, package dev).
 
 ### 11.2 NPM
 
 ```
-npm install --save-dev @vendor/asset-shield
+npm install --save-dev @asset-shield/vite-plugin
 ```
 
 - Vite peer dependency; `javascript-obfuscator` is an optional peer (only needed when obfuscation is

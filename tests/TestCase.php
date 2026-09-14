@@ -1,24 +1,31 @@
 <?php
 
-namespace Vendor\AssetShield\Tests;
+namespace Shamimstack\AssetShield\Tests;
 
 use Orchestra\Testbench\TestCase as Orchestra;
-use Vendor\AssetShield\AssetDeliveryDriver;
-use Vendor\AssetShield\AssetManifest;
-use Vendor\AssetShield\AssetRegistry;
-use Vendor\AssetShield\AssetResponse;
-use Vendor\AssetShield\AssetShieldManager;
-use Vendor\AssetShield\AssetShieldServiceProvider;
-use Vendor\AssetShield\AssetUrlGenerator;
-use Vendor\AssetShield\Delivery\PublicFileDriver;
-use Vendor\AssetShield\Delivery\StreamDriver;
-use Vendor\AssetShield\Http\Controllers\AssetController;
-use Vendor\AssetShield\Signer\AssetSigner;
+use Shamimstack\AssetShield\Delivery\AssetDeliveryDriver;
+use Shamimstack\AssetShield\AssetManifest;
+use Shamimstack\AssetShield\AssetRegistry;
+use Shamimstack\AssetShield\AssetResolver;
+use Shamimstack\AssetShield\AssetResponse;
+use Shamimstack\AssetShield\AssetShieldManager;
+use Shamimstack\AssetShield\AssetShieldServiceProvider;
+use Shamimstack\AssetShield\AssetUrlGenerator;
+use Shamimstack\AssetShield\Masking\Legend;
+use Shamimstack\AssetShield\Delivery\PublicDriver;
+use Shamimstack\AssetShield\Delivery\StreamDriver;
+use Shamimstack\AssetShield\Http\Controllers\AssetController;
+use Shamimstack\AssetShield\Http\Middleware\VerifyAssetSignature;
+use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
+use Shamimstack\AssetShield\Security\Csp;
+use Shamimstack\AssetShield\Signer\AssetSigner;
 
 abstract class TestCase extends Orchestra
 {
     public const APP_KEY = 'base64:6fMu0G7YZ7pGFqfh50PMIkg4nV5n1kL4nV5n1kL4nV5n1kLZwA6s=';
     public const FIXTURES = __DIR__.'/Fixtures';
+
+    public const REGISTRY_FILE = self::FIXTURES.'/storage/app/assetshield/registry.json';
 
     protected function getPackageProviders($app): array
     {
@@ -34,17 +41,18 @@ abstract class TestCase extends Orchestra
         $app['config']->set('app.env', 'production');
 
         $app['config']->set('asset-shield.enabled', true);
-        $app['config']->set('asset-shield.mode', 'protected');
-        $app['config']->set('asset-shield.route_prefix', 'assets');
-        $app['config']->set('asset-shield.driver', 'public');
-        $app['config']->set('asset-shield.source_maps', false);
-        $app['config']->set('asset-shield.signature.enabled', true);
-        $app['config']->set('asset-shield.signature.expires', 300);
+        $app['config']->set('asset-shield.environment', 'production');
+        $app['config']->set('asset-shield.build.manifest', self::FIXTURES.'/public/build/manifest.json');
+        $app['config']->set('asset-shield.build.registry', self::REGISTRY_FILE);
+        $app['config']->set('asset-shield.build.out_dir', 'build');
+        $app['config']->set('asset-shield.build.source_maps', false);
+        $app['config']->set('asset-shield.runtime.enabled', true);
+        $app['config']->set('asset-shield.runtime.route_prefix', 'assets');
+        $app['config']->set('asset-shield.runtime.signed_urls', true);
+        $app['config']->set('asset-shield.runtime.expires', 300);
+        $app['config']->set('asset-shield.delivery.driver', 'public');
         $app['config']->set('asset-shield.cache.max_age', 31536000);
         $app['config']->set('asset-shield.cache.enabled', true);
-
-        $app['config']->set('asset-shield.manifest_path', self::FIXTURES.'/public/build/manifest.json');
-        $app['config']->set('asset-shield.registry_path', self::FIXTURES.'/storage/asset-shield/registry.json');
     }
 
     protected function setUp(): void
@@ -56,7 +64,7 @@ abstract class TestCase extends Orchestra
 
     protected function tearDown(): void
     {
-        @unlink(self::FIXTURES.'/storage/asset-shield/registry.json');
+        @unlink(self::REGISTRY_FILE);
 
         parent::tearDown();
     }
@@ -78,8 +86,8 @@ abstract class TestCase extends Orchestra
 
             $rows[] = [
                 'logical' => (string) $logical,
-                'compiled' => $manifest->compiledPath($record['file']),
-                'type' => \Vendor\AssetShield\Support\MimeMapper::family($manifest->compiledPath($record['file'])),
+                'file' => $manifest->compiledPath($record['file']),
+                'type' => \Shamimstack\AssetShield\Support\MimeMapper::family($manifest->compiledPath($record['file'])),
                 'integrity' => $record['integrity'] ?? null,
             ];
         }
@@ -98,13 +106,18 @@ abstract class TestCase extends Orchestra
             'asset-shield',
             AssetManifest::class,
             AssetRegistry::class,
+            Legend::class,
+            Csp::class,
+            ObfuscationEngine::class,
+            AssetResolver::class,
             AssetResponse::class,
             AssetSigner::class,
             AssetUrlGenerator::class,
-            PublicFileDriver::class,
+            PublicDriver::class,
             StreamDriver::class,
             AssetDeliveryDriver::class,
             AssetController::class,
+            VerifyAssetSignature::class,
         ] as $binding) {
             $this->app->forgetInstance($binding);
         }

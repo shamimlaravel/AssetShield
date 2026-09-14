@@ -1,6 +1,6 @@
 <?php
 
-namespace Vendor\AssetShield\Signer;
+namespace Shamimstack\AssetShield\Signer;
 
 /**
  * HMAC-SHA256 signature engine for protected asset URLs.

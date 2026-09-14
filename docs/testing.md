@@ -90,7 +90,7 @@ steps:
 
 ## Coverage expectations (MVP bar)
 
-- PHP: every FR-test in the [TRD §13 table](../TRD.md#13-test-plan) green.
+- PHP: every FR-test in the [TRD §13 table](./TRD.md#13-test-plan) green.
 - Node: every plugin contract green; no test asserts "impossible secrecy" (there is none).
 
 See [Troubleshooting](troubleshooting.md) when a test fails unexpectedly.

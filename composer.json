@@ -1,14 +1,14 @@
 {
-    "name": "vendor/asset-shield",
+    "name": "shamimstack/asset-shield",
     "description": "Laravel-native asset protection layer for Vite-powered applications. Opaque, signed, expiring asset URLs. Source maps off. Vendor-safe JS obfuscation.",
     "type": "library",
     "keywords": ["laravel", "vite", "assets", "security", "signing", "obfuscation", "hmac"],
     "license": "MIT",
-    "homepage": "https://github.com/vendor/asset-shield",
+    "homepage": "https://github.com/shamimstack/asset-shield",
     "authors": [
         {
             "name": "AssetShield Contributors",
-            "homepage": "https://github.com/vendor/asset-shield"
+            "homepage": "https://github.com/shamimstack/asset-shield"
         }
     ],
     "require": {
@@ -28,12 +28,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Vendor\\AssetShield\\": "src/"
+            "Shamimstack\\AssetShield\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Vendor\\AssetShield\\Tests\\": "tests/"
+            "Shamimstack\\AssetShield\\Tests\\": "tests/"
         }
     },
     "config": {
@@ -46,10 +46,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Vendor\\AssetShield\\AssetShieldServiceProvider"
+                "Shamimstack\\AssetShield\\AssetShieldServiceProvider"
             ],
             "aliases": {
-                "AssetShield": "Vendor\\AssetShield\\Facades\\AssetShield"
+                "AssetShield": "Shamimstack\\AssetShield\\Facades\\AssetShield"
             }
         }
     },
@@ -62,7 +62,7 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "support": {
-        "issues": "https://github.com/vendor/asset-shield/issues",
-        "source": "https://github.com/vendor/asset-shield"
+        "issues": "https://github.com/shamimstack/asset-shield/issues",
+        "source": "https://github.com/shamimstack/asset-shield"
     }
 }

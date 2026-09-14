@@ -1,23 +1,28 @@
 <?php
 
-namespace Vendor\AssetShield\Support;
+namespace Shamimstack\AssetShield\Support;
 
 /**
  * Deterministic, key-bound opaque identifiers.
  *
  * Derivation:
- *   opaqueId = substr( hex( HMAC-SHA256( APP_KEY, "asset-shield:" . canonicalPath ) ), 0, 16 )
+ *   opaqueId = "as_" . substr( hex( HMAC-SHA256( APP_KEY, "asset-shield:" . canonicalPath ) ), 0, 16 )
  *
  * Deterministic for the same compiled file + application key, so URLs remain
  * stable between identical deploys yet never reveal the real filesystem path,
  * and never use sequential integers.
+ *
+ * The `as_` prefix distinguishes AssetShield opaque IDs from arbitrary route
+ * segments and from FNV-based mask names, which are presentational only.
  */
 final class OpaqueId
 {
     public const LENGTH = 8; // bytes -> 16 hex characters
 
+    public const PREFIX = 'as_';
+
     /**
-     * @return string 16-character lowercase hex string.
+     * @return string "as_" + 16-character lowercase hex string.
      */
     public static function from(string $compiledRelativePath, string $appKey): string
     {
@@ -29,7 +34,7 @@ final class OpaqueId
 
         $digest = hash_hmac('sha256', 'asset-shield:'.$canonical, $appKey);
 
-        return substr($digest, 0, self::LENGTH * 2);
+        return self::PREFIX.substr($digest, 0, self::LENGTH * 2);
     }
 
     /**

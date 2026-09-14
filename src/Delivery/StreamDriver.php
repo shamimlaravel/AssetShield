@@ -1,9 +1,11 @@
 <?php
 
-namespace Vendor\AssetShield\Delivery;
+namespace Shamimstack\AssetShield\Delivery;
 
-use Vendor\AssetShield\AssetManifest;
-use Vendor\AssetShield\AssetResponse;
+use Shamimstack\AssetShield\AssetIdentity;
+use Shamimstack\AssetShield\AssetManifest;
+use Shamimstack\AssetShield\AssetResponse;
+use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -15,35 +17,36 @@ class StreamDriver implements AssetDeliveryDriver
 {
     public function __construct(
         private readonly AssetResponse $assetResponse,
+        private readonly AssetManifest $manifest,
     ) {
     }
 
     public function deliver(
-        AssetManifest $manifest,
-        string $compiledRelativePath,
-        string $contentType,
+        AssetIdentity $asset,
         ?int $cacheOverrideSeconds = null,
         bool $immutable = true,
     ): Response {
-        $path = $manifest->absolutePath($compiledRelativePath);
+        $path = $this->manifest->absolutePath($asset->file());
 
         if ($path === null || ! is_file($path)) {
-            throw new \Vendor\AssetShield\Exceptions\AssetNotFoundException(
-                'AssetShield could not locate the compiled asset "'.$compiledRelativePath.'".'
-            );
+            throw new AssetNotFoundException('AssetShield could not locate the compiled asset "'.$asset->file().'".');
         }
 
         return $this->assetResponse->fromPath(
             $path,
-            $contentType,
+            $asset->contentType() ?? 'application/octet-stream',
             $cacheOverrideSeconds,
             $immutable,
         );
     }
 
-    public function supports(AssetManifest $manifest, string $compiledRelativePath): bool
+    public function supports(AssetIdentity $asset): bool
     {
-        $path = $manifest->absolutePath($compiledRelativePath);
+        if ($asset->contentType() === null) {
+            return false;
+        }
+
+        $path = $this->manifest->absolutePath($asset->file());
 
         return $path !== null && is_file($path);
     }

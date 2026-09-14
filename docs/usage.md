@@ -38,7 +38,7 @@ The tag type (script vs. stylesheet) is inferred from the file type in the regis
 ## PHP facade
 
 ```php
-use Vendor\AssetShield\Facades\AssetShield;
+use Shamimstack\AssetShield\Facades\AssetShield;
 ```
 
 ### `AssetShield::url(string $entry, ?string $extra = '') : string`
@@ -106,7 +106,7 @@ it always has, so rollback is a one-line config change.
 
 ## Cache & signature notes
 
-- Emitted URLs include `expires` + `signature` when `signature.enabled=true`.
+- Emitted URLs include `expires` + `signature` when `runtime.signed_urls=true`.
 - Unsigned URLs are produced when signatures are disabled or when you call
   `AssetShield::url($entry, signed: false)`.
 - The browser receives **only** the opaque ID; the real compiled filename never appears in HTML.

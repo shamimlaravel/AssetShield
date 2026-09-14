@@ -1,6 +1,6 @@
 <?php
 
-use Vendor\AssetShield\Signer\AssetSigner;
+use Shamimstack\AssetShield\Signer\AssetSigner;
 
 it('serves an asset with a valid signature', function () {
     $opaque = opaqueFor('resources/js/app.js');

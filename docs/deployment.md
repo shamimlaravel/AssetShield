@@ -95,13 +95,13 @@ Notes:
 - Registry + manifest are **cached** in production (no per-request scans, no DB lookups).
 - Opaque IDs are immutable strings; resolution is an in-memory array lookup.
 - Long-lived HTTP caching (31536000s immutable) shifts work to browsers/CDN.
-- Delivery drivers abstract transportation: **PublicFileDriver** (default) and **StreamDriver** ship
+- Delivery drivers abstract transportation: **PublicDriver** (default) and **StreamDriver** ship
   in MVP; the same controller supports future `X-Accel-Redirect`, `X-Sendfile`, S3, R2, and CDN
   drivers without rework — enabling you to move bytes to the edge.
 
 ## 5. Environment matrix
 
-| Env | `enabled` | `signature.enabled` | `cache` | Notes |
+| Env | `runtime.enabled` | `runtime.signed_urls` | `cache` | Notes |
 |---|---|---|---|---|
 | Local dev | `true` | `true` | default | Use `@vite()` for HMR; AssetShield is inactive in dev server |
 | Staging | `true` | `true` | default | Run `doctor` here after each build |
@@ -110,9 +110,11 @@ Notes:
 
 ## 6. Hotlink protection
 
-`hotlink_protection` is off by default because correct host gating depends on your upstream
-(reverse proxy, CDN). When enabled, AssetShield validates the `Referer`/`Host` against the
-configured upstream host and rejects cross-site references. Set it explicitly, never on a guess.
+AssetShield has no built-in `hotlink_protection` switch — correct host gating depends on your
+upstream. Enforce it at the reverse proxy / CDN layer: validate the `Host` for `/assets/*` and, if
+you want to block cross-site references, gate on `Referer` or use signed URLs (HMAC + expiry) as the
+access boundary. Never rely on `Referer` alone — it is trivially spoofable and absent for many
+legitimate clients.
 
 ## 7. Verifying a release
 
