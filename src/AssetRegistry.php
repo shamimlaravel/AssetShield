@@ -52,7 +52,7 @@ class AssetRegistry
 
     public static function fromConfig(Application $app): self
     {
-        $path = (string) $app['config']->get('asset-shield.build.registry', 'storage/app/assetshield/registry.json');
+        $path = (string) $app['config']->get('asset-shield.build.registry', 'storage/app/asset-shield/registry.json');
 
         if ($path === '' || preg_match('/^[A-Za-z]:[\\\\\/]|^\//', $path) !== 1) {
             $path = $app->storagePath($path);

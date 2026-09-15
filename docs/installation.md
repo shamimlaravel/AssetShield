@@ -26,7 +26,7 @@ php artisan asset-shield:install
 This command:
 
 - publishes `config/asset-shield.php`
-- creates the storage path used by the registry and legend (`storage/app/assetshield/`)
+- creates the storage path used by the registry and legend (`storage/app/asset-shield/`)
 - prints the required Vite integration step
 - never overwrites an existing config file without confirmation
 
@@ -88,7 +88,33 @@ or the Blade directives:
 @assetShieldJs('resources/js/app.js')
 ```
 
-## 6. Verify
+## 6. Opt in to masking & obfuscation (optional)
+
+Masking, obfuscation, and the opaque runtime are all off by default so the first integration stays
+predictable and diffable. Turn them on per environment:
+
+```php
+// config/asset-shield.php
+'mask' => [
+    'enabled'  => true,
+    'strategy' => 'codename',  // preserve | nameless | codename
+    'seed'     => env('ASSET_SHIELD_SEED', 'a-long-secret-phrase'),
+],
+'obfuscation' => [
+    'enabled' => true,
+    'preset'  => 'balanced',   // light | balanced | aggressive
+],
+```
+
+Masked and obfuscated output is derived deterministically from your `ASSET_SHIELD_SEED`: keep it
+stable or every deploy renames every file (and breaks client caches). Obfuscation runs through Node
+during `vite build` and stays inert while `vite dev` serves readable source. Only the server ever
+reads the legend that maps names back.
+
+See [configuration.md](configuration.md) for aliases, include/exclude lists, the Vite-plugin options,
+and the caching rules. Masking is always disabled outside `production`.
+
+## 7. Verify
 
 ```bash
 php artisan asset-shield:status
@@ -116,6 +142,9 @@ AssetShield
 
 You can now open the page, view source, and confirm scripts load from
 `/assets/{opaque-id}` instead of `/build/assets/app-<hash>.js`.
+
+Once you complete step 6, the status output replaces those `disabled` lines with the live values —
+`Masking:  codename` and `Obfuscation:  balanced (engine found)`.
 
 ## What was NOT installed
 

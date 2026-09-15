@@ -72,6 +72,11 @@ export class MaskPlanner {
 
     constructor(private readonly config: MaskConfig) {}
 
+    /** Clear collision tracking between watch rebuilds. */
+    reset(): void {
+        this.used.clear();
+    }
+
     plan(logical: string, original: string): { original: string; file: string } {
         const dir = dirOf(original);
         const base = this.finalBasename(logical, original);

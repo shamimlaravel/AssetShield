@@ -33,7 +33,7 @@ afterEach(function () use (&$createdFixtureFiles) {
     }
     $createdFixtureFiles = [];
 
-    @unlink(storage_path('app/assetshield/legend.json'));
+    @unlink(storage_path('app/asset-shield/legend.json'));
     @unlink(storage_path('manifest-mask.json'));
 });
 
@@ -70,14 +70,14 @@ it('builds a registry with original names and validates the legend', function ()
         file_put_contents(public_path('build/'.$row['file']), "// mask\n");
     }
 
-    file_put_contents(storage_path('app/assetshield/legend.json'), json_encode($legendData, JSON_PRETTY_PRINT));
+    file_put_contents(storage_path('app/asset-shield/legend.json'), json_encode($legendData, JSON_PRETTY_PRINT));
     file_put_contents(storage_path('manifest-mask.json'), json_encode($manifestData, JSON_PRETTY_PRINT));
 
     config()->set('asset-shield.build.manifest', storage_path('manifest-mask.json'));
     config()->set('asset-shield.mask.enabled', true);
     config()->set('asset-shield.mask.strategy', 'nameless');
     config()->set('asset-shield.mask.seed', 'seed-1');
-    config()->set('asset-shield.mask.legend', storage_path('app/assetshield/legend.json'));
+    config()->set('asset-shield.mask.legend', storage_path('app/asset-shield/legend.json'));
     $this->reloadAssetShield();
 
     $this->artisan('asset-shield:build')
@@ -110,14 +110,14 @@ it('doctor fails when the mask seed does not match the legend', function () use 
 
     $createdFixtureFiles[] = public_path('build/'.$app['file']);
     file_put_contents(public_path('build/'.$app['file']), "// mask\n");
-    file_put_contents(storage_path('app/assetshield/legend.json'), json_encode($legendData, JSON_PRETTY_PRINT));
+    file_put_contents(storage_path('app/asset-shield/legend.json'), json_encode($legendData, JSON_PRETTY_PRINT));
     file_put_contents(storage_path('manifest-mask.json'), json_encode($manifestData, JSON_PRETTY_PRINT));
 
     config()->set('asset-shield.build.manifest', storage_path('manifest-mask.json'));
     config()->set('asset-shield.mask.enabled', true);
     config()->set('asset-shield.mask.strategy', 'nameless');
     config()->set('asset-shield.mask.seed', 'a-different-seed');
-    config()->set('asset-shield.mask.legend', storage_path('app/assetshield/legend.json'));
+    config()->set('asset-shield.mask.legend', storage_path('app/asset-shield/legend.json'));
     $this->reloadAssetShield();
 
     $kernel = app(\Illuminate\Contracts\Console\Kernel::class);
@@ -143,11 +143,11 @@ it('keeps original names when mask is enabled but no legend exists', function ()
     config()->set('asset-shield.mask.enabled', true);
     config()->set('asset-shield.mask.strategy', 'nameless');
     config()->set('asset-shield.mask.seed', 'seed-1');
-    config()->set('asset-shield.mask.legend', storage_path('app/assetshield/legend.json'));
+    config()->set('asset-shield.mask.legend', storage_path('app/asset-shield/legend.json'));
     $this->reloadAssetShield();
 
     // No legend on disk (afterEach cleans it, but ensure absence).
-    @unlink(storage_path('app/assetshield/legend.json'));
+    @unlink(storage_path('app/asset-shield/legend.json'));
 
     $this->artisan('asset-shield:build')
         ->assertExitCode(0)

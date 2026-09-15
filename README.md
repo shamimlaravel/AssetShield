@@ -92,10 +92,10 @@ See [docs/configuration.md](docs/configuration.md) for the full reference. Highl
 'build'      => [
     'out_dir'     => 'build',
     'manifest'    => 'public/build/manifest.json',
-    'registry'    => 'storage/app/assetshield/registry.json',
+    'registry'    => 'storage/app/asset-shield/registry.json',
     'source_maps' => false,
 ],
-'mask' => ['enabled' => false, 'strategy' => 'preserve', 'seed' => '', 'legend' => 'app/assetshield/legend.json'],
+'mask' => ['enabled' => false, 'strategy' => 'preserve', 'seed' => '', 'legend' => 'app/asset-shield/legend.json'],
 'obfuscation'=> ['enabled' => false, 'preset' => 'balanced', 'engine' => 'javascript-obfuscator', 'exclude_vendor' => true],
 'runtime'    => ['enabled' => false, 'route_prefix' => 'assets', 'signed_urls' => true, 'expires' => 300],
 'delivery'   => ['driver' => 'public'],

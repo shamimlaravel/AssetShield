@@ -34,8 +34,8 @@ export default defineConfig({
         assetShieldVite({
             // defaults shown
             enabled: true,
-            registryFile: 'storage/app/assetshield/registry.json',
-            legendFile: 'storage/app/assetshield/legend.json',
+            registryFile: 'storage/app/asset-shield/registry.json',
+            legendFile: 'storage/app/asset-shield/legend.json',
             sourceMaps: false,
             mask: { enabled: false },
             obfuscation: { enabled: false },
@@ -61,8 +61,8 @@ export default defineConfig({
 ```ts
 export type AssetShieldViteOptions = {
     enabled?: boolean;                          // default true
-    registryFile?: string;                      // default 'storage/app/assetshield/registry.json'
-    legendFile?: string;                        // default 'storage/app/assetshield/legend.json'
+    registryFile?: string;                      // default 'storage/app/asset-shield/registry.json'
+    legendFile?: string;                        // default 'storage/app/asset-shield/legend.json'
     buildDir?: string;                          // default 'build' (public-relative compiled dir)
     sourceMaps?: boolean;                       // default false
     logLevel?: 'info' | 'warn' | 'error' | 'silent';  // default 'info'
@@ -195,7 +195,7 @@ Vite/PostCSS territory.
 Two JSON artifacts, both **outside `public/`** and never served by AssetShield:
 
 ```jsonc
-// storage/app/assetshield/registry.json  (v2)
+// storage/app/asset-shield/registry.json  (v2)
 {
   "version": 1,
   "built_at": "2026-09-13T12:00:00Z",
@@ -208,7 +208,7 @@ Two JSON artifacts, both **outside `public/`** and never served by AssetShield:
   }
 }
 
-// storage/app/assetshield/legend.json   (only when masking writes names)
+// storage/app/asset-shield/legend.json   (only when masking writes names)
 {
   "version": 1,
   "built_at": "2026-09-13T12:00:00Z",

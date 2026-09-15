@@ -296,7 +296,7 @@ return [
     'build' => [
         'out_dir'     => 'build',
         'manifest'    => 'public/build/manifest.json',
-        'registry'    => 'storage/app/assetshield/registry.json',
+        'registry'    => 'storage/app/asset-shield/registry.json',
         'source_maps' => false,
     ],
 
@@ -304,7 +304,7 @@ return [
         'enabled'  => false,
         'strategy' => 'preserve',
         'seed'     => '',
-        'legend'   => 'app/assetshield/legend.json',
+        'legend'   => 'app/asset-shield/legend.json',
     ],
 
     'obfuscation' => [

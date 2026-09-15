@@ -121,7 +121,7 @@ public function handle($request, Closure $next)
 
 ## The masking legend
 
-The legend (default `storage/app/assetshield/legend.json`) is the one AssetShield artifact that
+The legend (default `storage/app/asset-shield/legend.json`) is the one AssetShield artifact that
 reconstructs the original (pre-mask) names. Treat it as secret:
 
 - Keep it out of `public/` (AssetShield refuses to serve it) and out of public repository history.

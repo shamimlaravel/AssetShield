@@ -52,7 +52,7 @@ class MaskPlanner
             return;
         }
 
-        $seed = (string) ($config['seed'] ?? 'asset-shield');
+        $seed = self::resolveSeed($config['seed'] ?? '');
         $this->resolver = match ($config['strategy'] ?? 'nameless') {
             'codename' => new CodenameResolver($seed),
             'preserve' => new PreserveResolver(),
@@ -79,7 +79,7 @@ class MaskPlanner
         $k = 0;
         while (isset($this->used[$candidate])) {
             $k++;
-            $suffix = substr(Fnv1a::hex8(($this->config['seed'] ?? 'asset-shield').':collide:'.$originalFile.':'.$k), 0, 2);
+            $suffix = substr(Fnv1a::hex8(self::resolveSeed($this->config['seed'] ?? '').':collide:'.$originalFile.':'.$k), 0, 2);
 
             $name = $ext === ''
                 ? $base.'-'.$suffix
@@ -98,8 +98,8 @@ class MaskPlanner
      */
     public function shouldMask(string $path): bool
     {
-        $include = $this->config['include'] ?? ['**'];
-        $exclude = $this->config['exclude'] ?? [];
+        $include = ($this->config['include'] ?? []) === [] ? ['**'] : (array) $this->config['include'];
+        $exclude = (array) ($this->config['exclude'] ?? []);
 
         return $this->matchesAny($path, $include) && ! $this->matchesAny($path, $exclude);
     }
@@ -130,5 +130,16 @@ class MaskPlanner
         }
 
         return false;
+    }
+
+    /**
+     * Empty/missing seeds fall back to "asset-shield", mirroring the Vite
+     * plugin (`seed || 'asset-shield'`) so PHP recomputation always matches.
+     */
+    private static function resolveSeed(mixed $seed): string
+    {
+        $seed = (string) ($seed ?? '');
+
+        return $seed === '' ? 'asset-shield' : $seed;
     }
 }

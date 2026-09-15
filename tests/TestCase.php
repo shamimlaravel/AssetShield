@@ -25,7 +25,7 @@ abstract class TestCase extends Orchestra
     public const APP_KEY = 'base64:6fMu0G7YZ7pGFqfh50PMIkg4nV5n1kL4nV5n1kL4nV5n1kLZwA6s=';
     public const FIXTURES = __DIR__.'/Fixtures';
 
-    public const REGISTRY_FILE = self::FIXTURES.'/storage/app/assetshield/registry.json';
+    public const REGISTRY_FILE = self::FIXTURES.'/storage/app/asset-shield/registry.json';
 
     protected function getPackageProviders($app): array
     {

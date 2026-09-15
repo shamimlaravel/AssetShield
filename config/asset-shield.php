@@ -45,7 +45,7 @@ return [
     'build' => [
         'out_dir' => env('ASSET_SHIELD_BUILD_OUT_DIR', 'build'),
         'manifest' => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
-        'registry' => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/assetshield/registry.json'),
+        'registry' => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/asset-shield/registry.json'),
         'source_maps' => env('ASSET_SHIELD_SOURCE_MAPS', false),
     ],
 
@@ -60,10 +60,13 @@ return [
     |           'preserve' (keep Vite names; explicit per-asset aliases still
     |           apply).
     | seed      Deterministic seed for the name generator. Empty falls back to
-    |           the application key so outputs differ between applications.
+    |           "asset-shield" (mirroring the Vite plugin's `seed || 'asset-shield'`),
+    |           so PHP recomputation and doctor checks stay in sync. Set a stable
+    |           custom value to keep names consistent across machines.
     | aliases   Explicit logical -> filename overrides (with collision checks).
     | include/  Globs constraining which files participate in masking.
-    | exclude   Files outside them keep their Vite names.
+    | exclude   Files outside them keep their Vite names. An empty include list
+    |           masks everything, matching the plugin.
     | dictionary Shared codename wordlist theme for generator lookups.
     | legend    Secret legend mapping logical -> { original, masked }.
     |           MUST stay outside public/ (never routed, never served).
@@ -81,7 +84,7 @@ return [
         'include' => [],
         'exclude' => [],
         'dictionary' => env('ASSET_SHIELD_MASK_DICTIONARY', 'default'),
-        'legend' => env('ASSET_SHIELD_LEGEND_PATH', 'app/assetshield/legend.json'),
+        'legend' => env('ASSET_SHIELD_LEGEND_PATH', 'app/asset-shield/legend.json'),
     ],
 
     /*

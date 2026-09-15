@@ -38,6 +38,7 @@ final class MimeMapper
         'php4',
         'php5',
         'phar',
+        'cs',
         'env',
         'lock',
         'git',

@@ -132,7 +132,7 @@ Pure dependencies (no cycles). Arrows mean "depends on / uses".
       │
       ├───────────────► AssetManifest ──────────────► public/build/manifest.json (cached)
       │
-      ├───────────────► AssetRegistry ──────────────► storage/asset-shield/registry.json (cached)
+      ├───────────────► AssetRegistry ──────────────► storage/app/asset-shield/registry.json (cached)
       │
       ├───────────────► AssetUrlGenerator ──────────► Signer\HmacAssetSigner
       │                    │                          Support\OpaqueId
@@ -205,7 +205,7 @@ opaqueId = substr( hex( HMAC-SHA256( app_key, "asset-shield:" . canonicalCompile
 ### 5.3 Registry Payload
 
 ```jsonc
-// storage/asset-shield/registry.json  (written by vite plugin or asset-shield:build)
+// storage/app/asset-shield/registry.json  (written by vite plugin or asset-shield:build)
 {
   "version": 1,
   "built_at": "2026-09-13T12:00:00Z",
@@ -295,7 +295,7 @@ Guard rails that make traversal structurally impossible:
 - The relative compiled path is appended against the **config-resolved public build directory**
   and canonicalized (`realpath`) inside that root; any escape → 404.
 - No user-supplied query value is ever interpreted as a file path.
-- `.map`, `.env`, PHP files are excluded by extension in the MIME/delivery whitelist.
+- `.map`, `.env`, source files (`.php`, `.cs`), and lockfiles are excluded by extension in the MIME/delivery whitelist.
 
 ---
 
@@ -347,7 +347,7 @@ AssetShield reduces exposure, gates access, and raises reverse-engineering cost 
 ```ts
 export interface AssetShieldViteOptions {
   enabled?: boolean;                    // default true; production-only anyway
-  registryFile?: string;                // default 'storage/asset-shield/registry.json'
+  registryFile?: string;                // default 'storage/app/asset-shield/registry.json'
   obfuscation?: {
     enabled?: boolean;                  // default false
     preset?: 'light' | 'balanced' | 'aggressive'; // default 'balanced'
@@ -494,7 +494,7 @@ Composer package: **no** full-framework requirement; only `illuminate/*` pieces 
 
 ## 16. Resolved Implementation Notes
 
-- Registry persistence path — `storage/asset-shield/registry.json` (default), config override supported,
+- Registry persistence path — `storage/app/asset-shield/registry.json` (default), config override supported,
   kept outside `public/` (server-loads via `AssetRegistry::fromConfig`).
 - Default driver — `PublicDriver` (whitelist-friendly production); configurable via
   `asset-shield.delivery.driver`; `StreamDriver` for readfile-based passthrough.

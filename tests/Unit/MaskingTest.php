@@ -79,6 +79,23 @@ test('planner resolves collisions deterministically', function () {
     expect($one['file'])->not->toBe($two['file']);
 });
 
+test('empty seed falls back to asset-shield, matching the vite plugin', function () {
+    $empty = new MaskPlanner(['enabled' => true, 'strategy' => 'nameless', 'seed' => '']);
+    $explicit = new MaskPlanner(['enabled' => true, 'strategy' => 'nameless', 'seed' => 'asset-shield']);
+
+    expect($empty->plan('resources/js/app.js', 'assets/app-A91Kx.js'))
+        ->toBe($explicit->plan('resources/js/app.js', 'assets/app-A91Kx.js'));
+});
+
+test('empty include list matches everything, like the vite plugin', function () {
+    $none = new MaskPlanner(['enabled' => true, 'strategy' => 'nameless', 'seed' => 's', 'include' => []]);
+    $all = new MaskPlanner(['enabled' => true, 'strategy' => 'nameless', 'seed' => 's']);
+
+    expect($none->shouldMask('assets/app-A91Kx.js'))->toBeTrue()
+        ->and($none->plan('resources/js/app.js', 'assets/app-A91Kx.js'))
+        ->toBe($all->plan('resources/js/app.js', 'assets/app-A91Kx.js'));
+});
+
 test('codename and nameless differ for the same input', function () {
     $hash = new HashResolver('same-seed');
     $code = new CodenameResolver('same-seed');

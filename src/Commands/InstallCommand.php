@@ -10,7 +10,7 @@ class InstallCommand extends Command
 
     protected $description = 'Publish the AssetShield config, create required paths, and print the Vite integration';
 
-    private const STORAGE_DIR = 'app/assetshield';
+    private const STORAGE_DIR = 'app/asset-shield';
 
     public function handle(): int
     {
@@ -49,7 +49,7 @@ class InstallCommand extends Command
         $dir = $this->laravel->storagePath(self::STORAGE_DIR);
 
         if (is_dir($dir)) {
-            $this->components->info('Found existing storage/app/assetshield directory.');
+            $this->components->info('Found existing storage/app/asset-shield directory.');
 
             return;
         }
@@ -60,7 +60,7 @@ class InstallCommand extends Command
             return;
         }
 
-        $this->components->info('Created storage/app/assetshield (registry and legend live here, outside public/).');
+        $this->components->info('Created storage/app/asset-shield (registry and legend live here, outside public/).');
     }
 
     private function printViteSetup(): void

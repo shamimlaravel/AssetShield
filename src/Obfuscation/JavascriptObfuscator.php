@@ -94,11 +94,11 @@ final class JavascriptObfuscator implements ObfuscationEngine
             }
             JS;
 
-        $srcFile = tempnam(sys_get_temp_dir(), 'assetshield-src-');
+        $srcFile = tempnam(sys_get_temp_dir(), 'asset-shield-src-');
         if ($srcFile === false) {
             throw new ObfuscationException('Could not create a temp source file.');
         }
-        $dstFile = tempnam(sys_get_temp_dir(), 'assetshield-out-');
+        $dstFile = tempnam(sys_get_temp_dir(), 'asset-shield-out-');
         if ($dstFile === false) {
             @unlink($srcFile);
             throw new ObfuscationException('Could not create a temp output file.');

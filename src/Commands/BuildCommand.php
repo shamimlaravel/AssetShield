@@ -14,7 +14,6 @@ use Shamimstack\AssetShield\Support\OpaqueId;
 class BuildCommand extends Command
 {
     protected $signature = 'asset-shield:build
-        {--fresh : Regenerate the registry from the manifest, dropping any existing entries}
         {--run : Run "npm run build" first when the manifest is missing}';
 
     protected $description = 'Verify the Vite manifest, regenerate/validate the AssetShield registry and record the mask legend';
@@ -132,6 +131,8 @@ class BuildCommand extends Command
             'strategy' => (string) ($config['strategy'] ?? 'nameless'),
             'seed' => (string) ($config['seed'] ?? ''),
             'aliases' => (array) ($config['aliases'] ?? []),
+            'include' => (array) ($config['include'] ?? []),
+            'exclude' => (array) ($config['exclude'] ?? []),
         ]);
 
         $renamed = 0;

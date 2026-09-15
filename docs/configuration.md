@@ -33,7 +33,7 @@ return [
     'build' => [
         'out_dir'      => env('ASSET_SHIELD_BUILD_OUT_DIR', 'build'),
         'manifest'     => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
-        'registry'     => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/assetshield/registry.json'),
+        'registry'     => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/asset-shield/registry.json'),
         'source_maps'  => env('ASSET_SHIELD_SOURCE_MAPS', false),
     ],
 
@@ -41,7 +41,11 @@ return [
     | Masking: deterministic build-time filename renaming applied by the
     | Vite plugin through output-naming hooks. Presentational, NOT encryption.
     |   seed        stable seed; must match the plugin's mask.seed or
-    |               asset-shield:build / :doctor fail fast on mismatch.
+    |               asset-shield:build / :doctor fail fast on mismatch. Empty
+    |               falls back to "asset-shield" on both sides.
+    |   aliases     logical -> filename overrides (with collision checks).
+    |   include     globs; an empty/include-missing list masks everything.
+    |   exclude     files kept at their Vite names.
     |   legend      artifact path (base-relative), e.g. storage/app/... . It is
     |               resolved via storagePath() and must stay outside public/.
     */
@@ -53,7 +57,7 @@ return [
         'include'    => [],
         'exclude'    => [],
         'dictionary' => env('ASSET_SHIELD_MASK_DICTIONARY', 'default'),
-        'legend'     => env('ASSET_SHIELD_LEGEND_PATH', 'app/assetshield/legend.json'),
+        'legend'     => env('ASSET_SHIELD_LEGEND_PATH', 'app/asset-shield/legend.json'),
     ],
 
     /*
@@ -128,13 +132,13 @@ return [
 | `ASSET_SHIELD_ENV` | `APP_ENV` | Build target environment |
 | `ASSET_SHIELD_BUILD_OUT_DIR` | `build` | Public-relative Vite output dir |
 | `ASSET_SHIELD_MANIFEST_PATH` | `public/build/manifest.json` | Vite manifest |
-| `ASSET_SHIELD_REGISTRY_PATH` | `storage/app/assetshield/registry.json` | Registry (server-owned) |
+| `ASSET_SHIELD_REGISTRY_PATH` | `storage/app/asset-shield/registry.json` | Registry (server-owned) |
 | `ASSET_SHIELD_SOURCE_MAPS` | `false` | Whether source maps are built (never hidden) |
 | `ASSET_SHIELD_MASK` | `false` | Enable masking |
 | `ASSET_SHIELD_MASK_STRATEGY` | `preserve` | `preserve` \| `nameless` \| `codename` |
 | `ASSET_SHIELD_MASK_SEED` | `''` | Name seed — must match the plugin |
 | `ASSET_SHIELD_MASK_DICTIONARY` | `default` | Codename wordlist theme |
-| `ASSET_SHIELD_LEGEND_PATH` | `app/assetshield/legend.json` | Secret masking legend (storagePath-relative) |
+| `ASSET_SHIELD_LEGEND_PATH` | `app/asset-shield/legend.json` | Secret masking legend (storagePath-relative) |
 | `ASSET_SHIELD_OBFUSCATION` | `false` | Enable obfuscation (mirrored in plugin) |
 | `ASSET_SHIELD_OBFUSCATION_PRESET` | `balanced` | `light` \| `balanced` \| `aggressive` |
 | `ASSET_SHIELD_OBFUSCATION_ENGINE` | `javascript-obfuscator` | Engine name |

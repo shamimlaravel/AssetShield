@@ -16,7 +16,7 @@ namespace Shamimstack\AssetShield\Masking;
  *                                "masked": "assets/42623f48.js" }
  *     } }
  *
- * It MUST live outside public/ (default: storage/app/assetshield/legend.json),
+ * It MUST live outside public/ (default: storage/app/asset-shield/legend.json),
  * is never routed and never served.
  */
 class Legend
@@ -37,7 +37,7 @@ class Legend
 
     public static function fromConfig(\Illuminate\Contracts\Foundation\Application $app): self
     {
-        $path = (string) $app['config']->get('asset-shield.mask.legend', 'app/assetshield/legend.json');
+        $path = (string) $app['config']->get('asset-shield.mask.legend', 'app/asset-shield/legend.json');
 
         if ($path === '' || preg_match('/^[A-Za-z]:[\\\\\/]|^\//', $path) !== 1) {
             $path = $app->storagePath($path);

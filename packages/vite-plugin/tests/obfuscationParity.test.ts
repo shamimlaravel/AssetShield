@@ -231,7 +231,7 @@ describe('logLevel and build report', () => {
             {
                 obfuscation: { enabled: true, preset: 'light' },
                 logLevel,
-                registryFile: 'storage/app/assetshield/registry.json',
+                registryFile: 'storage/app/asset-shield/registry.json',
             },
             { engine: engineFor(obfuscator), fs: fakeFs } as never,
         );

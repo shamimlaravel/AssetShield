@@ -29,7 +29,7 @@ it('reports available only when the package entry exists', function (string $dir
 
     expect($engine->isAvailable())->toBeFalse();
 })->with(function () {
-    $dir = sys_get_temp_dir().'/assetshield-jso-'.bin2hex(random_bytes(4));
+    $dir = sys_get_temp_dir().'/asset-shield-jso-'.bin2hex(random_bytes(4));
     mkdir($dir, 0777, true);
 
     return ['dir' => $dir];
@@ -46,7 +46,7 @@ it('obfuscates source through a real node process when the package is a fake mod
         $this->markTestSkipped('node is not on PATH.');
     }
 
-    $dir = sys_get_temp_dir().'/assetshield-jso-'.bin2hex(random_bytes(4));
+    $dir = sys_get_temp_dir().'/asset-shield-jso-'.bin2hex(random_bytes(4));
     mkdir($dir, 0777, true);
 
     $engine = new JavascriptObfuscator('node', fakeObfuscatorModule($dir));
@@ -60,7 +60,7 @@ it('obfuscates source through a real node process when the package is a fake mod
 }, ['timeout' => 30]);
 
 it('throws a helpful exception when the package is missing', function () {
-    $dir = sys_get_temp_dir().'/assetshield-jso-'.bin2hex(random_bytes(4));
+    $dir = sys_get_temp_dir().'/asset-shield-jso-'.bin2hex(random_bytes(4));
     mkdir($dir, 0777, true);
 
     $engine = new JavascriptObfuscator('node', $dir.'/missing.js');

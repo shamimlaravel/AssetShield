@@ -81,6 +81,23 @@ describe('mask parity', () => {
         expect(planner.plan('app', 'assets/app-A91Kx.js').file).toBe('assets/main.js');
         expect(planner.plan('vendor', 'assets/vendor/vue.js').file).toBe('assets/vendor/vue.js');
     });
+
+    it('reset() clears collision state between watch rebuilds', () => {
+        const planner = new MaskPlanner({ enabled: true, strategy: 'codename', seed: 's', aliases: {}, include: [], exclude: [] });
+
+        const buildOne = planner.plan('a', 'assets/x/index.js').file;
+        const buildTwo = planner.plan('b', 'assets/x/index.js').file;
+
+        expect(buildOne).not.toBe(buildTwo);
+
+        planner.reset();
+
+        const rebuiltOne = planner.plan('a', 'assets/x/index.js').file;
+        const rebuiltTwo = planner.plan('b', 'assets/x/index.js').file;
+
+        expect(rebuiltOne).toBe(buildOne);
+        expect(rebuiltTwo).toBe(buildTwo);
+    });
 });
 
 describe('plugin mask integration', () => {
@@ -150,8 +167,8 @@ describe('plugin mask integration', () => {
         expect(chunkNamesTwo({ name: 'app', isEntry: true })).toBe(cssFile);
         await (pluginTwo.closeBundle as () => unknown).call({ warn: () => undefined, info: () => undefined });
 
-        const registryPath = '/project/storage/app/assetshield/registry.json';
-        const legendPath = '/project/storage/app/assetshield/legend.json';
+        const registryPath = '/project/storage/app/asset-shield/registry.json';
+        const legendPath = '/project/storage/app/asset-shield/legend.json';
 
         const registry = JSON.parse(writes.get(registryPath) ?? '{}') as {
             assets: Record<string, { file: string; type: string; original?: string; integrity?: string }>;
@@ -191,7 +208,49 @@ describe('plugin mask integration', () => {
         await (plugin.configResolved as (config: unknown) => unknown).call({ warn: () => undefined }, config);
         await (plugin.closeBundle as () => unknown).call({ warn: () => undefined, info: () => undefined });
 
-        expect(writes.has('/project/storage/app/assetshield/legend.json')).toBe(false);
-        expect(writes.has('/project/storage/app/assetshield/registry.json')).toBe(true);
+        expect(writes.has('/project/storage/app/asset-shield/legend.json')).toBe(false);
+        expect(writes.has('/project/storage/app/asset-shield/registry.json')).toBe(true);
+    });
+
+    it('renders the [format] placeholder in custom output templates', async () => {
+        const fsLike: FsLike = {
+            existsSync: (path) => path.endsWith('manifest.json'),
+            readFileSync: () => JSON.stringify(MANIFEST),
+            writeFileSync: () => undefined,
+            mkdirSync: () => undefined,
+        };
+
+        const plugin = assetShieldVite(
+            {
+                mask: {
+                    enabled: true,
+                    strategy: 'nameless',
+                    seed: 'test-seed',
+                    exclude: ['assets/app-*'],
+                },
+            },
+            { fs: fsLike },
+        ) as unknown as {
+            configResolved: (config: unknown) => unknown;
+        };
+        const config: Record<string, unknown> = {
+            root: '/project',
+            build: {
+                outDir: '/project/public/build',
+                rollupOptions: {
+                    output: { entryFileNames: 'assets/[name]-[format].js' },
+                },
+            },
+        };
+
+        await (plugin.configResolved as (config: unknown) => unknown).call({ warn: () => undefined, info: () => undefined }, config);
+
+        const output = (config.build as Record<string, unknown>).rollupOptions as { output: Record<string, unknown> };
+        const entryNames = output.output.entryFileNames as (info: unknown, options: { format: string }) => string;
+
+        expect(entryNames({ name: 'app', isEntry: true }, { format: 'es' })).toBe('assets/app-es.js');
+
+        // Masked (non-excluded) entries still resolve deterministically.
+        expect(entryNames({ name: 'vendor', isEntry: true }, { format: 'es' })).toMatch(/^assets\/[a-f0-9]{8}\.js$/);
     });
 });

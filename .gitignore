@@ -5,8 +5,8 @@
 /packages/vite-plugin/node_modules
 /packages/vite-plugin/dist
 /packages/vite-plugin/package-lock.json
-/tests/Fixtures/storage/app/assetshield/registry.json
-/tests/Fixtures/storage/app/assetshield/legend.json
+/tests/Fixtures/storage/app/asset-shield/registry.json
+/tests/Fixtures/storage/app/asset-shield/legend.json
 /.idea
 /.vscode
 *.log

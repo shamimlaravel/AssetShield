@@ -41,7 +41,6 @@ export interface AssetShieldViteOptions {
     obfuscation?: {
         enabled?: boolean;
         preset?: ObfuscationPreset;
-        engine?: 'javascript-obfuscator';
         options?: ObfuscatorOptions;
         obfuscateChunks?: ObfuscateChunks;
         include?: string[];
@@ -151,8 +150,8 @@ function normalizeOptions(input: AssetShieldViteOptions): NormalizedOptions {
 
     return {
         enabled: input.enabled ?? true,
-        registryFile: input.registryFile ?? 'storage/app/assetshield/registry.json',
-        legendFile: input.legendFile ?? 'storage/app/assetshield/legend.json',
+        registryFile: input.registryFile ?? 'storage/app/asset-shield/registry.json',
+        legendFile: input.legendFile ?? 'storage/app/asset-shield/legend.json',
         buildDir: input.buildDir ?? 'build',
         sourceMaps: input.sourceMaps ?? false,
         logLevel: input.logLevel ?? 'info',
@@ -282,10 +281,11 @@ function assetExtname(info: unknown, kind: TemplateKind): string {
     return index > 0 ? name.slice(index) : '';
 }
 
-function renderTemplate(template: string, kind: TemplateKind, info: unknown, patternHash: string): string {
+function renderTemplate(template: string, kind: TemplateKind, info: unknown, patternHash: string, format = 'es'): string {
     return template
         .replace(/\[hash:(\d+)\]/g, (_match, length: string) => patternHash.slice(0, Number(length)))
         .replace(/\[hash\]/g, patternHash)
+        .replace(/\[format\]/g, format)
         .replace(/\[extname\]/g, assetExtname(info, kind))
         .replace(/\[ext\]/g, kind === 'asset' ? assetExtname(info, kind).replace(/^\./, '') : 'js')
         .replace(/\[assetInfo\.name\]/g, assetName(info, kind))
@@ -304,6 +304,9 @@ function wrapOutputName(
     patternHashOf: (name: string) => string,
 ): (info: unknown, options: unknown) => string {
     return (info, options) => {
+        const format = typeof options === 'object' && options !== null && 'format' in options
+            ? String((options as { format?: string }).format ?? 'es')
+            : 'es';
         let defaultPath: string;
 
         if (typeof original === 'function') {
@@ -317,9 +320,9 @@ function wrapOutputName(
                 defaultPath = '';
             }
         } else if (typeof original === 'string') {
-            defaultPath = renderTemplate(original, kind, info, patternHashOf(assetName(info, kind)));
+            defaultPath = renderTemplate(original, kind, info, patternHashOf(assetName(info, kind)), format);
         } else {
-            defaultPath = renderTemplate(DEFAULT_TEMPLATES[kind], kind, info, patternHashOf(assetName(info, kind)));
+            defaultPath = renderTemplate(DEFAULT_TEMPLATES[kind], kind, info, patternHashOf(assetName(info, kind)), format);
         }
 
         if (defaultPath === '') {
@@ -408,6 +411,13 @@ export function assetShieldVite(input: AssetShieldViteOptions = {}, deps: Plugin
     return {
         name: 'asset-shield',
         apply: 'build',
+        buildStart() {
+            // Watch-mode rebuilds reuse this plugin instance; clear the
+            // collision tracker and rename map so names stay deterministic
+            // across rebuilds instead of accumulating suffixes.
+            maskPlanner.reset();
+            finalToOriginal.clear();
+        },
         configResolved(resolved) {
             config = resolved;
             const log = makeLogger(this as unknown as HookContext, options.logLevel);

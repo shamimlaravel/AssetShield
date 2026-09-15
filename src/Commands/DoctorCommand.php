@@ -8,6 +8,7 @@ use Shamimstack\AssetShield\AssetManifest;
 use Shamimstack\AssetShield\AssetRegistry;
 use Shamimstack\AssetShield\Masking\MaskPlanner;
 use Shamimstack\AssetShield\Masking\Legend;
+use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
 
 class DoctorCommand extends Command
 {
@@ -15,9 +16,9 @@ class DoctorCommand extends Command
 
     protected $description = 'Inspect the deployment for AssetShield security and configuration problems';
 
-    public function handle(AssetManifest $manifest, AssetRegistry $registry, Legend $legend): int
+    public function handle(AssetManifest $manifest, AssetRegistry $registry, Legend $legend, ObfuscationEngine $engine): int
     {
-        $checks = $this->checks($manifest, $registry, $legend);
+        $checks = $this->checks($manifest, $registry, $legend, $engine);
         $failures = 0;
         $warnings = 0;
 
@@ -67,7 +68,7 @@ class DoctorCommand extends Command
     /**
      * @return array<int,array{state:'ok'|'warn'|'fail',label:string,detail:string}>
      */
-    private function checks(AssetManifest $manifest, AssetRegistry $registry, Legend $legend): array
+    private function checks(AssetManifest $manifest, AssetRegistry $registry, Legend $legend, ObfuscationEngine $engine): array
     {
         $config = config('asset-shield');
         $environment = (string) config('app.env');
@@ -161,6 +162,8 @@ class DoctorCommand extends Command
                     'strategy' => (string) ($mask['strategy'] ?? 'nameless'),
                     'seed' => (string) ($mask['seed'] ?? ''),
                     'aliases' => (array) ($mask['aliases'] ?? []),
+                    'include' => (array) ($mask['include'] ?? []),
+                    'exclude' => (array) ($mask['exclude'] ?? []),
                 ]);
 
                 $mismatches = [];
@@ -249,6 +252,18 @@ class DoctorCommand extends Command
             $checks[] = $this->versionCheck($label, $bin, $arg);
         }
         $checks[] = $this->row('info', 'Laravel', app()->version());
+        $checks[] = $this->viteVersionCheck();
+
+        // 13. Obfuscation engine availability (only meaningful when enabled)
+        $obfuscation = (array) ($config['obfuscation'] ?? []);
+
+        if ((bool) ($obfuscation['enabled'] ?? false)) {
+            $checks[] = $engine->isAvailable()
+                ? $this->row('ok', 'Obfuscation engine available', 'javascript-obfuscator found by the adapter.')
+                : $this->row('fail', 'Obfuscation engine missing', 'javascript-obfuscator is not installed/available for the configured adapter.');
+        } else {
+            $checks[] = $this->row('info', 'Obfuscation disabled', '');
+        }
 
         return $checks;
     }
@@ -281,6 +296,43 @@ class DoctorCommand extends Command
         }
 
         return $this->row('info', $label, strtok($output, "\n"));
+    }
+
+    /**
+     * Vite lives in node_modules, not on PATH, so resolve it from the project
+     * root. Falls back to the bundled manifest version when the binary is not
+     * executable but the package is present.
+     */
+    private function viteVersionCheck(): array
+    {
+        $root = base_path();
+        $bin = $root.'/node_modules/.bin/vite'.(defined('PHP_WINDOWS_VERSION_BUILD') ? '.cmd' : '');
+
+        try {
+            if (is_file($bin)) {
+                $process = new Process([$bin, '--version'], $root, null, null, 3);
+                $process->run();
+                $output = trim($process->getOutput() ?: $process->getErrorOutput());
+
+                if ($process->isSuccessful() && $output !== '') {
+                    return $this->row('info', 'Vite', strtok($output, "\n"));
+                }
+            }
+
+            $manifest = $root.'/node_modules/vite/package.json';
+
+            if (is_file($manifest)) {
+                $version = (string) (json_decode((string) file_get_contents($manifest), true)['version'] ?? '');
+
+                if ($version !== '') {
+                    return $this->row('info', 'Vite', 'v'.$version.' (package.json)');
+                }
+            }
+        } catch (\Throwable $e) {
+            return $this->row('info', 'Vite unavailable', $e->getMessage());
+        }
+
+        return $this->row('info', 'Vite unavailable', 'Could not locate vite in node_modules — frontend builds are expected to use Vite.');
     }
 
     private function envLocationCheck(string $path, string $label): array

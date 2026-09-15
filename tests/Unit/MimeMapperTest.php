@@ -23,7 +23,7 @@ test('MimeMapper rejects unknown extensions', function () {
 });
 
 test('MimeMapper flags forbidden server-side files', function () {
-    foreach (['.env', 'config.php', 'package-lock.json', 'composer.json', 'app.js.map'] as $name) {
+    foreach (['.env', 'config.php', 'package-lock.json', 'composer.json', 'app.js.map', 'example.cs'] as $name) {
         expect(MimeMapper::isForbidden('build/'.$name))->toBeTrue();
     }
 

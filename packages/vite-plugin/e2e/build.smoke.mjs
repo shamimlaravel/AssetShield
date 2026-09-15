@@ -28,8 +28,8 @@ function listFiles(dir) {
     return out;
 }
 
-async function runBuild({ outDirName, obfuscation }) {
-    const root = mkdtempSync(join(tmpdir(), 'assetshield-e2e-'));
+async function runBuild({ outDirName, obfuscation, strategy = 'nameless' }) {
+    const root = mkdtempSync(join(tmpdir(), 'asset-shield-e2e-'));
     roots.push(root);
 
     mkdirSync(join(root, 'src'), { recursive: true });
@@ -42,7 +42,7 @@ async function runBuild({ outDirName, obfuscation }) {
         logLevel: 'silent',
         plugins: [
             assetShieldVite({
-                mask: { enabled: true, strategy: 'nameless', seed },
+                mask: { enabled: true, strategy, seed },
                 obfuscation,
             }),
         ],
@@ -60,8 +60,8 @@ async function runBuild({ outDirName, obfuscation }) {
     return {
         root,
         outDir,
-        registryFile: join(root, normalize('storage/app/assetshield/registry.json')),
-        legendFile: join(root, normalize('storage/app/assetshield/legend.json')),
+        registryFile: join(root, normalize('storage/app/asset-shield/registry.json')),
+        legendFile: join(root, normalize('storage/app/asset-shield/legend.json')),
     };
 }
 
@@ -90,6 +90,34 @@ try {
     const bytesA = readFileSync(buildAFile, 'utf8');
     check(bytesA.includes('asset-shield e2e'), 'mask: built bytes exist on disk');
     check(listFiles(buildA.outDir).filter((file) => file.endsWith('.map')).length === 0, 'mask: no source maps');
+
+    // Codename strategy: adjective-noun names produced and back-mapped.
+    const buildC = await runBuild({ outDirName: 'build-c', obfuscation: { enabled: false }, strategy: 'codename' });
+
+    const registryC = JSON.parse(readFileSync(buildC.registryFile, 'utf8'));
+    const legendC = JSON.parse(readFileSync(buildC.legendFile, 'utf8'));
+
+    const entryKeyC = Object.keys(registryC.assets).find((key) => key.endsWith('main.js'));
+    const entryC = entryKeyC === undefined ? undefined : registryC.assets[entryKeyC];
+    const codenameFile = entryC?.file?.replace(/^build-c\//, '');
+    check(Boolean(entryC), 'codename: registry has src/main.js');
+    check(new RegExp('^assets/[a-z]+-[a-z]+\\.js$').test(codenameFile ?? ''), `codename: adjective-noun shape (${codenameFile})`);
+
+    const originalC = Object.keys(legendC.entries).find((key) => legendC.entries[key].masked === codenameFile);
+    check(Boolean(originalC), `codename: legend back-maps (${originalC})`);
+    check(listFiles(buildC.outDir).filter((file) => file.endsWith('.map')).length === 0, 'codename: no source maps');
+
+    // Preserve strategy: empty seed falls back to 'asset-shield' — file keeps
+    // its Vite name (mask on, but no renaming).
+    const buildD = await runBuild({ outDirName: 'build-d', obfuscation: { enabled: false }, strategy: 'preserve' });
+
+    const registryD = JSON.parse(readFileSync(buildD.registryFile, 'utf8'));
+    const entryKeyD = Object.keys(registryD.assets).find((key) => key.endsWith('main.js'));
+    const entryD = entryKeyD === undefined ? undefined : registryD.assets[entryKeyD];
+    const preserveFile = entryD?.file?.replace(/^build-d\//, '');
+    check(Boolean(entryD), 'preserve: registry has src/main.js');
+    check(String(preserveFile ?? '').startsWith('assets/main-'), `preserve: keeps Vite basename (${preserveFile})`);
+    check(listFiles(buildD.outDir).filter((file) => file.endsWith('.map')).length === 0, 'preserve: no source maps');
 
     const buildB = await runBuild({ outDirName: 'build-b', obfuscation: { enabled: true, preset: 'balanced' } });
 
