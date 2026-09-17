@@ -2,9 +2,20 @@
     "name": "asset-shield-package",
     "private": true,
     "description": "Root package for AssetShield (Laravel package + Vite plugin) monorepo scripts.",
+    "workspaces": [
+        "packages/*"
+    ],
     "scripts": {
+        "setup": "composer install && npm install",
         "test": "npm run test:php && npm run test:node",
         "test:php": "composer test",
         "test:node": "npm --prefix packages/vite-plugin run test"
+    },
+    "devDependencies": {
+        "@asset-shield/vite-plugin": "^0.2.0"
+    },
+    "allowScripts": {
+        "esbuild@0.27.7": true,
+        "esbuild@0.25.12": true
     }
 }

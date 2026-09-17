@@ -17,6 +17,7 @@
         }
     },
     "scripts": {
+        "prepare": "tsup",
         "build": "tsup",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
@@ -50,9 +51,5 @@
     },
     "engines": {
         "node": ">=18"
-    },
-    "allowScripts": {
-        "esbuild@0.27.7": true,
-        "esbuild@0.25.12": true
     }
 }
