@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 use Shamimstack\AssetShield\Support\MimeMapper;
@@ -16,6 +18,10 @@ use Shamimstack\AssetShield\Support\MimeMapper;
  */
 final class AssetIdentity
 {
+    private bool $contentTypeResolved = false;
+
+    private ?string $contentType = null;
+
     public function __construct(
         private readonly string $logical,
         private readonly string $file,
@@ -56,23 +62,18 @@ final class AssetIdentity
         return $this->integrity;
     }
 
-    public function isStyle(): bool
-    {
-        return $this->type === 'style';
-    }
-
-    public function isScript(): bool
-    {
-        return $this->type === 'script';
-    }
-
     /**
      * Content-Type determined from the compiled file, or null when the file is
      * not a protected asset type (the controller rejects such assets).
      */
     public function contentType(): ?string
     {
-        return MimeMapper::forPath($this->file);
+        if (! $this->contentTypeResolved) {
+            $this->contentType = MimeMapper::forPath($this->file);
+            $this->contentTypeResolved = true;
+        }
+
+        return $this->contentType;
     }
 
     /**

@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 use Illuminate\Contracts\Foundation\Application;
 use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
 use Shamimstack\AssetShield\Exceptions\ManifestNotFoundException;
+use Shamimstack\AssetShield\Support\ArtifactCache;
 use Shamimstack\AssetShield\Support\OpaqueId;
+use Shamimstack\AssetShield\Support\Path;
 
 /**
  * Reads the Laravel/Vite production manifest (public/build/manifest.json),
@@ -17,8 +21,12 @@ use Shamimstack\AssetShield\Support\OpaqueId;
  */
 class AssetManifest
 {
+    /** @var array<string, mixed>|null */
     private ?array $data = null;
     private ?string $publicRoot = null;
+
+    /** @var array<string, string|null> memoized absolutePath results */
+    private array $absolutePathCache = [];
 
     public function __construct(
         private readonly string $path,
@@ -31,7 +39,7 @@ class AssetManifest
     {
         $path = (string) $app['config']->get('asset-shield.build.manifest', 'public/build/manifest.json');
 
-        if (! self::isAbsolute($path)) {
+        if (! Path::isAbsolute($path)) {
             $path = $app->basePath($path);
         }
 
@@ -87,8 +95,10 @@ class AssetManifest
     }
 
     /**
-     * Raw decoded manifest data (memoized per worker).
+     * Raw decoded manifest data (memoized per worker; served from the Laravel
+     * cache in production).
      *
+     * @return array<string, mixed>
      * @throws ManifestNotFoundException
      */
     public function data(): array
@@ -97,6 +107,38 @@ class AssetManifest
             return $this->data;
         }
 
+        return $this->data = $this->readFromCacheOrDisk();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readFromCacheOrDisk(): array
+    {
+        if (! $this->cacheEnabled()) {
+            return $this->loadFromDisk();
+        }
+
+        $key = static::cacheKey($this->path);
+        $cached = ArtifactCache::read($key, $this->path);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $fresh = $this->loadFromDisk();
+
+        ArtifactCache::write($key, $this->path, $fresh);
+
+        return $fresh;
+    }
+
+    /**
+     * @return array<string, mixed>
+     * @throws ManifestNotFoundException
+     */
+    private function loadFromDisk(): array
+    {
         if (! $this->exists()) {
             throw ManifestNotFoundException::missing($this->path());
         }
@@ -107,7 +149,21 @@ class AssetManifest
             throw ManifestNotFoundException::invalid($this->path(), json_last_error_msg() ?: 'invalid JSON');
         }
 
-        return $this->data = $decoded;
+        return $decoded;
+    }
+
+    private function cacheEnabled(): bool
+    {
+        return ArtifactCache::enabled($this->app);
+    }
+
+    /**
+     * The Laravel-cache key holding the decoded manifest. Keyed by resolved
+     * path so different builds/installs never share a payload.
+     */
+    public static function cacheKey(string $path): string
+    {
+        return ArtifactCache::key('manifest', $path);
     }
 
     /**
@@ -115,6 +171,8 @@ class AssetManifest
      * record (src, file, isEntry, css, assets, integrity, ...).
      *
      * @throws AssetNotFoundException
+     *
+     * @return array<string, mixed>
      */
     public function resolve(string $entry): array
     {
@@ -154,6 +212,17 @@ class AssetManifest
      */
     public function absolutePath(string $compiledRelativePath): ?string
     {
+        if (array_key_exists($compiledRelativePath, $this->absolutePathCache)) {
+            return $this->absolutePathCache[$compiledRelativePath];
+        }
+
+        $result = $this->resolveAbsolutePath($compiledRelativePath);
+
+        return $this->absolutePathCache[$compiledRelativePath] = $result;
+    }
+
+    private function resolveAbsolutePath(string $compiledRelativePath): ?string
+    {
         if (! OpaqueId::isSafe($compiledRelativePath)) {
             return null;
         }
@@ -177,19 +246,16 @@ class AssetManifest
     }
 
     /**
-     * Drop a manifest from the worker cache forcing a re-read.
+     * Drop a manifest from the worker cache (and the production cache, when
+     * enabled) forcing a re-read from disk on next access.
      */
     public function refresh(): void
     {
         $this->data = null;
-    }
+        $this->absolutePathCache = [];
 
-    private static function isAbsolute(string $path): bool
-    {
-        if (str_starts_with($path, '/') || (bool) preg_match('/^[A-Za-z]:[\\\\\/]/', $path)) {
-            return true;
+        if ($this->cacheEnabled()) {
+            ArtifactCache::forget(static::cacheKey($this->path));
         }
-
-        return false;
     }
 }

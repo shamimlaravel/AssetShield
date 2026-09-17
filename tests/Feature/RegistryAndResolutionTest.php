@@ -41,6 +41,14 @@ test('manager resolve throws for unregistered entries', function () {
     app(AssetShieldManager::class)->resolve('resources/js/nope.js');
 })->throws(AssetNotFoundException::class);
 
+test('manager exposes the bound signer, registry and manifest accessors', function () {
+    $manager = app(AssetShieldManager::class);
+
+    expect($manager->signer())->toBe(app(\Shamimstack\AssetShield\Signer\AssetSigner::class))
+        ->and($manager->registry())->toBe(app(AssetRegistry::class))
+        ->and($manager->manifest())->toBe(app(\Shamimstack\AssetShield\AssetManifest::class));
+});
+
 test('registry rejects directory traversal at build time', function () {
     app(AssetRegistry::class)->create([
         ['logical' => 'evil', 'file' => '../../.env', 'type' => 'js'],

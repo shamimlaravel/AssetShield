@@ -78,7 +78,6 @@ export type AssetShieldViteOptions = {
     obfuscation?: {
         enabled?: boolean;                      // default false
         preset?: 'light' | 'balanced' | 'aggressive';   // default 'balanced'
-        engine?: 'javascript-obfuscator';       // default
         options?: Record<string, unknown>;      // deep-merged over the preset
         obfuscateChunks?: 'application' | 'entries' | 'all';   // default 'application'
         include?: string[];                     // glob of chunk names to include
@@ -148,6 +147,16 @@ assetShieldVite({
 > AssetShield does not make browser-delivered code impossible to inspect. It reduces exposure,
 > protects asset access, and increases the cost of reverse engineering. Obfuscation is **not
 > encryption** — an attacker with time and tooling can always reverse it.
+
+### How obfuscation runs
+
+The engine loads `javascript-obfuscator` **in-process** — a single require per build process, cached
+for its lifetime — and transforms each matched chunk directly in `renderChunk`. No Node subprocess is
+spawned and no temp files are written on the happy path. A subprocess fallback exists and is used only
+when that require fails (e.g. package-manager layouts that break `resolve`), in which case it stages
+the chunk in a temp dir and removes it afterwards. Either way the plugin surface is unchanged:
+`enabled` / `preset` / `obfuscateChunks` / `include` / `exclude` — there is no `engine`,
+`node_binary`, `package_path` or `timeout` option to configure.
 
 ### Chunk selection rules
 

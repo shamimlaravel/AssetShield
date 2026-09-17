@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Delivery;
 
 use Shamimstack\AssetShield\AssetIdentity;

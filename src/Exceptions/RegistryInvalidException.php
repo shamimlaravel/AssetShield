@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Exceptions;
 
 use RuntimeException;
@@ -8,7 +10,7 @@ use RuntimeException;
  * Thrown when the AssetShield registry artifact is missing or structurally
  * invalid (absolute paths, traversal, missing fields).
  */
-class RegistryInvalidException extends RuntimeException
+final class RegistryInvalidException extends RuntimeException
 {
     public static function missing(string $path): self
     {

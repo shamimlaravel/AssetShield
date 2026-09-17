@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Document** | Product Requirements Document (PRD) |
-| **Version** | 0.1.0 |
+| **Version** | 0.2.0 |
 | **Status** | MVP |
 | **Product** | AssetShield |
 | **Stack** | Laravel 13 · PHP 8.3+ · Vite ≥ 5 · Node ≥ 18 |
@@ -113,8 +113,8 @@ problems.
    `AssetShield::url|script|style`.
 10. Vite plugin (`packages/vite-plugin`, TypeScript) — production-only, registry generation,
     optional JS obfuscation, vendor-chunk rules, preserves chunking/dynamic imports.
-11. Obfuscation adapter (`ObfuscationEngine`) with `JavascriptObfuscatorEngine` and `light` /
-    `balanced` / `aggressive` presets; **disabled by default**.
+11. Obfuscation native to the Vite plugin — `light` / `balanced` / `aggressive` presets, vendor-safe
+    by default, **disabled by default**; no PHP-side engine is exposed.
 12. Source maps disabled by default; never exposed for protected assets; intentional enabling is
     warned about in logs.
 13. Security and cache headers on responses.
@@ -162,7 +162,7 @@ Requirements are numbered and referenced from the TRD (`FR-xx`) and test plan.
   generated files, exposes metadata, caches in production.
 - **FR-07** Unresolvable assets throw a useful exception naming the entry and the manifest path.
 - **FR-08** `AssetRegistry` maps logical asset → compiled asset → opaque ID
-  (`resources/js/app.js` → `assets/app-A91Kx.js` → `7f92a8c1`).
+  (`resources/js/app.js` → `assets/app-A91Kx.js` → `as_2ae34e8b0c462491`).
 - **FR-09** The registry is persisted (generated/updated by `asset-shield:build` or the Vite
   plugin) and contains no public filesystem paths in what is transmitted to the client.
 
@@ -205,7 +205,9 @@ Requirements are numbered and referenced from the TRD (`FR-xx`) and test plan.
 
 ### 7.8 Obfuscation
 
-- **FR-26** `ObfuscationEngine` interface with `JavascriptObfuscatorEngine` adapter.
+- **FR-26** JS obfuscation runs natively inside the Vite plugin via `javascript-obfuscator`
+  (optional peer); there is no PHP-side engine. The plugin requires the package in-process (a single
+  lookup per build, cached), with a subprocess fallback only when that require fails.
 - **FR-27** Presets `light|balanced|aggressive`, default `balanced`; **disabled by default**.
 - **FR-28** Default chunk rule `application` (application chunks obfuscated, `node_modules` vendor
   chunks skipped); overridable via `obfuscateChunks: 'application' | 'entries' | 'all'` plus
@@ -294,40 +296,51 @@ return [
     'environment'    => env('ASSET_SHIELD_ENV', env('APP_ENV', 'production')),
 
     'build' => [
-        'out_dir'     => 'build',
-        'manifest'    => 'public/build/manifest.json',
-        'registry'    => 'storage/app/asset-shield/registry.json',
-        'source_maps' => false,
+        'out_dir'     => env('ASSET_SHIELD_BUILD_OUT_DIR', 'build'),
+        'manifest'    => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
+        'registry'    => env('ASSET_SHIELD_REGISTRY_PATH', 'app/asset-shield/registry.json'),
+        'source_maps' => env('ASSET_SHIELD_SOURCE_MAPS', false),
     ],
 
     'mask' => [
-        'enabled'  => false,
-        'strategy' => 'preserve',
-        'seed'     => '',
-        'legend'   => 'app/asset-shield/legend.json',
+        'enabled'  => env('ASSET_SHIELD_MASK', false),
+        'strategy' => env('ASSET_SHIELD_MASK_STRATEGY', 'preserve'),
+        'seed'     => env('ASSET_SHIELD_MASK_SEED', ''),
+        'aliases'  => [],
+        'include'  => [],
+        'exclude'  => [],
+        'legend'   => env('ASSET_SHIELD_LEGEND_PATH', 'app/asset-shield/legend.json'),
     ],
 
     'obfuscation' => [
-        'enabled'        => false,
-        'preset'         => 'balanced',
-        'engine'         => 'javascript-obfuscator',
-        'exclude_vendor' => true,
+        'enabled'        => env('ASSET_SHIELD_OBFUSCATION', false),
+        'preset'         => env('ASSET_SHIELD_OBFUSCATION_PRESET', 'balanced'),
+        'exclude_vendor' => env('ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR', true),
+    ],
+
+    'security' => [
+        'csp'       => env('ASSET_SHIELD_CSP', false),
+        'allowlist' => [
+            'script' => [],
+            'style'  => [],
+            'img'    => [],
+        ],
     ],
 
     'runtime' => [
-        'enabled'      => false,
+        'enabled'      => env('ASSET_SHIELD_RUNTIME', false),
         'route_prefix' => env('ASSET_SHIELD_ROUTE_PREFIX', 'assets'),
-        'signed_urls'  => true,
-        'expires'      => 300,
+        'signed_urls'  => env('ASSET_SHIELD_SIGNED_URLS', true),
+        'expires'      => env('ASSET_SHIELD_SIGNATURE_EXPIRES', 300),
     ],
 
     'delivery' => [
-        'driver' => 'public',
+        'driver' => env('ASSET_SHIELD_DRIVER', 'public'),
     ],
 
     'cache' => [
-        'enabled' => true,
-        'max_age' => 31536000,
+        'enabled' => env('ASSET_SHIELD_CACHE', true),
+        'max_age' => env('ASSET_SHIELD_CACHE_MAX_AGE', 31536000),
     ],
 ];
 ```
@@ -353,6 +366,30 @@ npm install --save-dev @asset-shield/vite-plugin
 
 - Vite peer dependency; `javascript-obfuscator` is an optional peer (only needed when obfuscation is
   enabled).
+
+### 11.3 Uninstall
+
+Removal is a Composer/npm-level operation — there is **no** artisan uninstall command. Artisan
+exposes exactly four commands: `asset-shield:install`, `asset-shield:build`, `asset-shield:status`,
+`asset-shield:doctor`.
+
+```
+composer remove shamimstack/asset-shield     # unregisters the provider (auto-discovery)
+npm uninstall --save-dev @asset-shield/vite-plugin
+```
+
+Composer and npm only remove the packages themselves. Everything installation published or created
+stays on disk and must be cleaned up manually:
+
+1. Delete the published config — `config/asset-shield.php` (or revert it from version control).
+2. Remove `assetShieldVite()` from `vite.config.js` / `vite.config.ts`.
+3. Revert `@shieldVite([...])` to `@vite([...])` in Blade and delete any `@assetShield`,
+   `@assetShieldJs`, `@assetShieldCss` directives.
+4. Delete the build artifacts under `storage/app/asset-shield/` (`registry.json`, `legend.json`).
+   They are regenerated on the next build and are not needed once the package is gone.
+
+Nothing else is touched: no database tables, no runtime-mutated `public/` files beyond the normal
+`build` output.
 
 ---
 

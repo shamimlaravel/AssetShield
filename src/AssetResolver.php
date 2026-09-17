@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 /**
@@ -22,16 +24,6 @@ class AssetResolver
     public function resolveOpaque(string $opaque): ?AssetIdentity
     {
         $entry = $this->registry->entryForOpaque($opaque);
-
-        return $entry === null ? null : $this->identityFromEntry($entry);
-    }
-
-    /**
-     * Identity for a logical entry, or null when unregistered.
-     */
-    public function resolveLogical(string $logical): ?AssetIdentity
-    {
-        $entry = $this->registry->entryForLogical($logical);
 
         return $entry === null ? null : $this->identityFromEntry($entry);
     }

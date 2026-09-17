@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 use Illuminate\Contracts\Foundation\Application;
@@ -15,8 +17,6 @@ use Shamimstack\AssetShield\Delivery\PublicDriver;
 use Shamimstack\AssetShield\Delivery\StreamDriver;
 use Shamimstack\AssetShield\Http\Controllers\AssetController;
 use Shamimstack\AssetShield\Http\Middleware\VerifyAssetSignature;
-use Shamimstack\AssetShield\Obfuscation\JavascriptObfuscator;
-use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
 use Shamimstack\AssetShield\Security\Csp;
 use Shamimstack\AssetShield\Signer\AssetSigner;
 use Shamimstack\AssetShield\Signer\HmacAssetSigner;
@@ -67,8 +67,6 @@ class AssetShieldServiceProvider extends ServiceProvider
             (array) $app['config']->get('asset-shield.security', []),
         ));
 
-        $this->app->bind(ObfuscationEngine::class, fn (Application $app) => JavascriptObfuscator::fromConfig($app));
-
         $this->app->singleton(AssetResolver::class, fn (Application $app) => new AssetResolver(
             $app->make(AssetRegistry::class),
         ));
@@ -97,7 +95,6 @@ class AssetShieldServiceProvider extends ServiceProvider
 
         $this->app->singleton(AssetSigner::class, fn (Application $app) => new HmacAssetSigner(
             (string) $app['config']->get('app.key'),
-            (int) $app['config']->get('asset-shield.runtime.expires', 300),
         ));
 
         $this->app->singleton(AssetUrlGenerator::class, fn (Application $app) => new AssetUrlGenerator(

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Exceptions;
 
 use RuntimeException;
@@ -21,6 +23,9 @@ class InvalidSignatureException extends RuntimeException implements HttpExceptio
         return 403;
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function getHeaders(): array
     {
         return [

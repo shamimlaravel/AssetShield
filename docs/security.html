@@ -230,7 +230,7 @@
       <a href="index.html#commands">Commands</a>
     </nav>
     <div style="display:flex;align-items:center;gap:.9rem">
-      <span class="version-pill">v0.1.0 MVP</span>
+      <span class="version-pill">v0.2.0</span>
       <a class="nav-cta" href="index.html#install">Install</a>
       <button type="button" class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-overlay">
         <span></span><span></span><span></span>
@@ -292,11 +292,11 @@
             impossible to request.</p>
           <div class="code"><span class="r">BAD</span>  GET /assets?file=../../.env          <span class="d">→ rejected (no such parameter exists)</span>
 <span class="r">BAD</span>  GET /assets/../../.env               <span class="d">→ route does not match</span>
-<span class="g">GOOD</span> GET /assets/7f92a8c1                 <span class="d">→ registry lookup → compiled file</span></div>
+<span class="g">GOOD</span> GET /assets/as_2ae34e8b0c462491    <span class="d">→ registry lookup → compiled file</span></div>
           <p>Path traversal, <code>.env</code> retrieval, storage/vendor traversal, and PHP-source
             reads are prevented at three layers:</p>
           <ol style="list-style:none;counter-reset:lay;display:grid;gap:.45rem;margin:.8rem 0 0">
-            <li style="display:flex;gap:.6rem;font-size:.9rem;color:var(--muted)"><span class="mono" style="color:var(--accent);flex:none">1</span> Route shape &mdash; the <code>{asset}</code> segment accepts only opaque IDs (<code>[a-f0-9]{8,32}</code>).</li>
+            <li style="display:flex;gap:.6rem;font-size:.9rem;color:var(--muted)"><span class="mono" style="color:var(--accent);flex:none">1</span> Route shape &mdash; the <code>{asset}</code> segment accepts only opaque IDs (<code>[a-z0-9_]{2,64}</code>).</li>
             <li style="display:flex;gap:.6rem;font-size:.9rem;color:var(--muted)"><span class="mono" style="color:var(--accent);flex:none">2</span> Registry-only resolution &mdash; ID &rarr; relative compiled path; no user string is ever treated as a path.</li>
             <li style="display:flex;gap:.6rem;font-size:.9rem;color:var(--muted)"><span class="mono" style="color:var(--accent);flex:none">3</span> Filesystem confinement &mdash; compiled paths are canonicalized against the public build root; any escape resolves to 404.</li>
           </ol>
@@ -304,7 +304,7 @@
 
         <div class="card">
           <h3>2. URL abstraction</h3>
-          <p>Users see <code>/assets/7f92a8c1</code>, never <code>/build/assets/app-A91Kx.js</code>,
+          <p>Users see <code>/assets/as_2ae34e8b0c462491</code>, never <code>/build/assets/app-A91Kx.js</code>,
             and with optional <b>masking</b> they no longer even see <code>app-A91Kx.js</code> &mdash;
             build-time filename renaming (<code>nameless</code> hashes or <code>codename</code> words)
             removes framework fingerprints and module boundaries from every served filename.
@@ -523,7 +523,7 @@
       </div>
     </div>
     <div class="foot-bottom">
-      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
+      <p>v0.2.0 &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
       <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
         exposure, protects asset access, and increases the cost of reverse engineering.</p>
     </div>

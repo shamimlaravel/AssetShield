@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Masking;
 
 use Shamimstack\AssetShield\Support\Fnv1a;
@@ -58,6 +60,31 @@ class MaskPlanner
             'preserve' => new PreserveResolver(),
             default => new HashResolver($seed),
         };
+    }
+
+    /**
+     * Build a planner from the published `asset-shield.mask` config so PHP-side
+     * recomputation and doctor checks always agree with the plugin's own seed.
+     *
+     * @param  array{
+     *     enabled?: bool,
+     *     strategy?: string,
+     *     seed?: string,
+     *     aliases?: array<string, string>,
+     *     include?: array<int, string>,
+     *     exclude?: array<int, string>,
+     *  }  $config
+     */
+    public static function fromConfig(array $config): self
+    {
+        return new self([
+            'enabled' => (bool) ($config['enabled'] ?? false),
+            'strategy' => (string) ($config['strategy'] ?? 'nameless'),
+            'seed' => (string) ($config['seed'] ?? ''),
+            'aliases' => (array) ($config['aliases'] ?? []),
+            'include' => (array) ($config['include'] ?? []),
+            'exclude' => (array) ($config['exclude'] ?? []),
+        ]);
     }
 
     /**

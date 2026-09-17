@@ -1,6 +1,6 @@
 {
     "name": "@asset-shield/vite-plugin",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Vite build plugin for AssetShield: deterministic filename masking, the protected-asset registry and legend, and optional obfuscation of application JS chunks. Vendoring-safe; CSS never obfuscated.",
     "type": "module",
     "files": [

@@ -23,7 +23,7 @@
 ## Project Files
 
 - [Landing Page](docs/index.html): Self-contained marketing/documentation site (dark security/terminal design)
-- [Changelog](CHANGELOG.md): Version history (0.1.0 MVP)
+- [Changelog](CHANGELOG.md): Version history (0.2.0)
 - [License](LICENSE): MIT
 
 ## Optional

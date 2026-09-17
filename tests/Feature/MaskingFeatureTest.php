@@ -127,6 +127,38 @@ it('doctor fails when the mask seed does not match the legend', function () use 
         ->and($kernel->output())->toContain('Masking legend mismatch');
 });
 
+it('is always read fresh from disk (never Laravel-cached)', function () use (&$createdFixtureFiles) {
+    $legendFile = storage_path('app/asset-shield/legend.json');
+
+    $writeLegend = function (string $original, string $masked) use ($legendFile) {
+        file_put_contents($legendFile, json_encode([
+            'version' => 1,
+            'seed' => 'seed-1',
+            'entries' => [$original => ['original' => $original, 'masked' => $masked]],
+        ], JSON_PRETTY_PRINT));
+    };
+
+    $createdFixtureFiles[] = public_path('build/assets/first-mask.js');
+    $writeLegend('assets/app-original.js', 'assets/first-mask.js');
+    file_put_contents(public_path('build/assets/first-mask.js'), "// mask\n");
+
+    $legend = new \Shamimstack\AssetShield\Masking\Legend($legendFile);
+
+    expect($legend->originalForMasked('assets/first-mask.js'))->toBe('assets/app-original.js');
+
+    // A fresh legend instance (i.e. a new worker/process) must see a plugin
+    // rebuild immediately — no cache purge required, because the legend is
+    // never stored in the Laravel cache.
+    $createdFixtureFiles[] = public_path('build/assets/second-mask.js');
+    $writeLegend('assets/app-original.js', 'assets/second-mask.js');
+    file_put_contents(public_path('build/assets/second-mask.js'), "// mask\n");
+
+    $fresh = new \Shamimstack\AssetShield\Masking\Legend($legendFile);
+
+    expect($fresh->originalForMasked('assets/second-mask.js'))->toBe('assets/app-original.js')
+        ->and($fresh->originalForMasked('assets/first-mask.js'))->toBeNull();
+});
+
 it('keeps original names when mask is enabled but no legend exists', function () use (&$createdFixtureFiles) {
     $planner = new MaskPlanner(['enabled' => true, 'strategy' => 'nameless', 'seed' => 'seed-1']);
     $app = $planner->plan('resources/js/app.js', 'assets/app-A91Kx.js');

@@ -11,7 +11,7 @@ This is useful for:
 ## How it works
 
 ```
-URL                  /assets/7f92a8c1?expires=1790000000&signature=ab9c…
+URL                  /assets/as_2ae34e8b0c462491?expires=1790000000&signature=ab9c…
 │
 ├─ expires  Unix timestamp (UTC). Absent → treated as non-expiring (signed only).
 └─ signature
@@ -20,8 +20,11 @@ URL                  /assets/7f92a8c1?expires=1790000000&signature=ab9c…
 Signature algorithm (server-side, secret = application key):
 
 ```
-signature = hex( HMAC-SHA256( APP_KEY, "asset-shield:" . opaqueId . ":" . (expires ?? 0) ) )
+signature = hex( HMAC-SHA256( APP_KEY, "asset-shield-sign:" . ":" . opaqueId . ":" . (expires ?? 0) ) )
 ```
+
+(The `asset-shield-sign:` prefix already ends in a colon, producing the double colon before the
+opaque ID.)
 
 Verification:
 
@@ -35,16 +38,17 @@ Verification:
 ```php
 use Shamimstack\AssetShield\Facades\AssetShield;
 
-// signed, non-expiring (signed URL w/o expiry)
+// signed with the configured default lifetime
 AssetShield::url('resources/js/app.js', signed: true);
 
-// signed, expires in 10 minutes
+// signed, expires in 10 minutes (Carbon or any DateTimeInterface is fine)
 AssetShield::url('resources/js/app.js', signed: true, expires: now()->addMinutes(10));
 ```
 
 When `config('asset-shield.runtime.signed_urls')` is `true`, `script()` / `style()` / `url()` emit
 signed, expiring URLs automatically using the configured default lifetime (`expires` = 300s by
-default).
+default). Requesting `signed: false` does **not** disable signing when the deployment enforces
+signed URLs — set `runtime.signed_urls=false` to serve plain public URLs.
 
 ## Direct signer API
 
@@ -55,8 +59,8 @@ use Shamimstack\AssetShield\Signer\AssetSigner;
 
 $signer = app(AssetSigner::class);   // resolves HmacAssetSigner
 
-$signature = $signer->sign('7f92a8c1', expires: 1790000000);     // returns hex
-$valid     = $signer->verify('7f92a8c1', 1790000000, $signature); // true|false
+$signature = $signer->sign('as_2ae34e8b0c462491', expires: 1790000000);     // returns hex
+$valid     = $signer->verify('as_2ae34e8b0c462491', 1790000000, $signature); // true|false
 ```
 
 ### `AssetSigner` interface
@@ -64,7 +68,7 @@ $valid     = $signer->verify('7f92a8c1', 1790000000, $signature); // true|false
 ```php
 interface AssetSigner
 {
-    public function sign(string $assetId, ?int $expires = null): string;
+    public function sign(string $assetId, int|\DateTimeInterface|null $expires = null): string;
     public function verify(string $assetId, ?int $expires, string $signature): bool;
 }
 ```

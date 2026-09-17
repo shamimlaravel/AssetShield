@@ -33,7 +33,7 @@ return [
     'build' => [
         'out_dir'      => env('ASSET_SHIELD_BUILD_OUT_DIR', 'build'),
         'manifest'     => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
-        'registry'     => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/asset-shield/registry.json'),
+        'registry'     => env('ASSET_SHIELD_REGISTRY_PATH', 'app/asset-shield/registry.json'),
         'source_maps'  => env('ASSET_SHIELD_SOURCE_MAPS', false),
     ],
 
@@ -56,24 +56,20 @@ return [
         'aliases'    => [],
         'include'    => [],
         'exclude'    => [],
-        'dictionary' => env('ASSET_SHIELD_MASK_DICTIONARY', 'default'),
         'legend'     => env('ASSET_SHIELD_LEGEND_PATH', 'app/asset-shield/legend.json'),
     ],
 
     /*
     | Obfuscation (mirrored from the plugin; informational on the PHP side).
-    | OPT-OUT-SAFE: disabled by default. Obfuscation is NOT encryption.
+    | OPT-OUT-SAFE: disabled by default. Obfuscation is NOT encryption. The
+    | engine itself is native to @asset-shield/vite-plugin — no PHP-side
+    | engine is exposed.
     |   exclude_vendor  node_modules chunks skipped on the plugin side.
-    |   node_binary / package_path  overrides for the PHP-side adapter.
     */
     'obfuscation' => [
         'enabled'         => env('ASSET_SHIELD_OBFUSCATION', false),
         'preset'          => env('ASSET_SHIELD_OBFUSCATION_PRESET', 'balanced'),
-        'engine'          => env('ASSET_SHIELD_OBFUSCATION_ENGINE', 'javascript-obfuscator'),
         'exclude_vendor'  => env('ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR', true),
-        'node_binary'     => env('ASSET_SHIELD_OBFUSCATION_NODE', 'node'),
-        'package_path'    => env('ASSET_SHIELD_OBFUSCATION_PACKAGE', ''),
-        'timeout'         => (float) env('ASSET_SHIELD_OBFUSCATION_TIMEOUT', 120.0),
     ],
 
     /*
@@ -98,11 +94,12 @@ return [
     ],
 
     /*
-    | HTTP caching for immutable production assets. For signed assets the
-    | max-age is clamped to the signature lifetime.
+    | HTTP caching for immutable production assets. In production the same
+    | switch warms the decoded manifest/registry payloads through the Laravel
+    | cache. For signed assets the max-age is clamped to the signature lifetime.
     */
     'cache' => [
-        'enabled'  => true,
+        'enabled'  => env('ASSET_SHIELD_CACHE', true),
         'max_age'  => env('ASSET_SHIELD_CACHE_MAX_AGE', 31536000),
     ],
 
@@ -132,24 +129,21 @@ return [
 | `ASSET_SHIELD_ENV` | `APP_ENV` | Build target environment |
 | `ASSET_SHIELD_BUILD_OUT_DIR` | `build` | Public-relative Vite output dir |
 | `ASSET_SHIELD_MANIFEST_PATH` | `public/build/manifest.json` | Vite manifest |
-| `ASSET_SHIELD_REGISTRY_PATH` | `storage/app/asset-shield/registry.json` | Registry (server-owned) |
+| `ASSET_SHIELD_REGISTRY_PATH` | `app/asset-shield/registry.json` | Registry (server-owned; resolved under storage) |
 | `ASSET_SHIELD_SOURCE_MAPS` | `false` | Whether source maps are built (never hidden) |
 | `ASSET_SHIELD_MASK` | `false` | Enable masking |
 | `ASSET_SHIELD_MASK_STRATEGY` | `preserve` | `preserve` \| `nameless` \| `codename` |
 | `ASSET_SHIELD_MASK_SEED` | `''` | Name seed — must match the plugin |
-| `ASSET_SHIELD_MASK_DICTIONARY` | `default` | Codename wordlist theme |
 | `ASSET_SHIELD_LEGEND_PATH` | `app/asset-shield/legend.json` | Secret masking legend (storagePath-relative) |
 | `ASSET_SHIELD_OBFUSCATION` | `false` | Enable obfuscation (mirrored in plugin) |
 | `ASSET_SHIELD_OBFUSCATION_PRESET` | `balanced` | `light` \| `balanced` \| `aggressive` |
-| `ASSET_SHIELD_OBFUSCATION_ENGINE` | `javascript-obfuscator` | Engine name |
 | `ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR` | `true` | Skip `node_modules` chunks |
-| `ASSET_SHIELD_OBFUSCATION_NODE` | `node` | Node binary for the PHP adapter |
-| `ASSET_SHIELD_OBFUSCATION_PACKAGE` | `''` | Override package entry path |
 | `ASSET_SHIELD_RUNTIME` | `false` | Protected runtime delivery (opt-in) |
 | `ASSET_SHIELD_ROUTE_PREFIX` | `assets` | Protected route prefix |
 | `ASSET_SHIELD_SIGNED_URLS` | `true` | HMAC-sign protected URLs |
 | `ASSET_SHIELD_SIGNATURE_EXPIRES` | `300` | Default signature lifetime (seconds) |
 | `ASSET_SHIELD_DRIVER` | `public` | `public` \| `stream` |
+| `ASSET_SHIELD_CACHE` | `true` | Cache-Control headers + production payload cache |
 | `ASSET_SHIELD_CACHE_MAX_AGE` | `31536000` | Cache header max-age |
 | `ASSET_SHIELD_CSP` | `false` | Strict CSP on asset responses |
 
@@ -171,6 +165,13 @@ AssetShield itself introduces **no** new secret material into your repository.
   server serve the files directly.
 - **`source_maps=true`**: only set this in non-public contexts. Even then asset delivery rejects
   `.map` for protected assets and your logs will contain a loud warning.
+- **`cache.enabled`** has two jobs. It sets `Cache-Control` headers on asset responses and — when
+  `asset-shield.environment=production` (the package's own switch, independent of the framework
+  `APP_ENV`) — serves the decoded manifest and registry payloads through the Laravel cache. Each cache
+  entry is keyed by artifact path and stores the artifact mtime alongside the payload, re-reading the
+  file whenever it changes — so even a rebuild that misses the explicit purge can never serve a stale
+  decoded payload. `ASSET_SHIELD_CACHE=false` disables both, switching back to reading the filesystem
+  on every cold request. `asset-shield:build` purges the payload keys.
 - **`security.csp=true`** adds an explicit `Content-Security-Policy` to protected asset responses
   (binary content needs none of the allowances a page does). For *pages*, use
   `AssetShield::cspHeader()` / `AssetShield::cspNonce()` — see [Security model](security.md).

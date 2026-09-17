@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Signer;
 
 /**
@@ -16,19 +18,18 @@ class HmacAssetSigner implements AssetSigner
 
     public function __construct(
         private readonly string $secret,
-        private readonly int $defaultExpires = 300,
         private readonly int $leeway = 5,
     ) {
     }
 
-    public function sign(string $assetId, ?int $expires = null): string
+    public function sign(string $assetId, int|\DateTimeInterface|null $expires = null): string
     {
-        return $this->signature($assetId, $expires ?? 0);
+        return $this->signature($assetId, $this->resolveExpires($expires));
     }
 
     public function verify(string $assetId, ?int $expires, string $signature): bool
     {
-        if (! is_string($signature) || $signature === '') {
+        if ($signature === '') {
             return false;
         }
 
@@ -49,18 +50,29 @@ class HmacAssetSigner implements AssetSigner
         return true;
     }
 
-    public function defaultExpires(): int
+    /**
+     * @param  int|\DateTimeInterface|null  $expires
+     */
+    private function resolveExpires(int|\DateTimeInterface|null $expires): int
     {
-        return $this->defaultExpires;
+        return match (true) {
+            $expires instanceof \DateTimeInterface => $expires->getTimestamp(),
+            $expires === null => 0,
+            default => $expires,
+        };
     }
 
     private function signature(string $assetId, int $expires): string
     {
-        if ($secret = trim($this->secret)) {
-            return hash_hmac('sha256', self::CONTEXT.':'.$assetId.':'.$expires, $secret);
+        $secret = trim($this->secret);
+
+        // Never sign with an empty/placeholder secret; fail closed. The literal
+        // "null" (unset APP_KEY serialized) is rejected too, matching the opaque
+        // id derivation, so a misconfigured key can never be used to mint URLs.
+        if ($secret === '' || strtolower($secret) === 'null') {
+            throw new \RuntimeException('AssetShield requires a real APP_KEY to sign asset URLs.');
         }
 
-        // Never sign with an empty/placeholder secret; fail closed.
-        throw new \RuntimeException('AssetShield requires a real APP_KEY to sign asset URLs.');
+        return hash_hmac('sha256', self::CONTEXT.':'.$assetId.':'.$expires, $secret);
     }
 }

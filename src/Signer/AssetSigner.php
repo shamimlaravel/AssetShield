@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Signer;
 
 /**
@@ -15,8 +17,11 @@ interface AssetSigner
      *
      * When $expires is null the signature covers a non-expiring URL (the
      * controller still requires a valid signature when signing is enabled).
+     *
+     * @param  int|\DateTimeInterface|null  $expires  absolute Unix timestamp
+     *                              or a DateTimeInterface (Carbon is fine).
      */
-    public function sign(string $assetId, ?int $expires = null): string;
+    public function sign(string $assetId, int|\DateTimeInterface|null $expires = null): string;
 
     /**
      * Verify a signature for an identifier; false when malformed, expired, or

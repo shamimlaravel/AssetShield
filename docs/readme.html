@@ -228,7 +228,7 @@
       <a href="index.html#commands">Commands</a>
     </nav>
     <div style="display:flex;align-items:center;gap:.9rem">
-      <span class="version-pill">v0.1.0 MVP</span>
+      <span class="version-pill">v0.2.0</span>
       <a class="nav-cta" href="index.html#install">Install</a>
       <button type="button" class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-overlay">
         <span></span><span></span><span></span>
@@ -288,7 +288,7 @@
             </thead>
             <tbody>
               <tr><td>Source outside web root</td><td><code>resources/</code>, <code>app/</code>, <code>routes/</code>, <code>vendor/</code>, <code>node_modules/</code>, <code>.env</code> never public</td></tr>
-              <tr><td>Opaque asset URLs</td><td><code>/assets/7f92a8c1</code> instead of <code>/build/assets/app-A91Kx.js</code></td></tr>
+              <tr><td>Opaque asset URLs</td><td><code>/assets/as_2ae34e8b0c462491</code> instead of <code>/build/assets/app-A91Kx.js</code></td></tr>
               <tr><td>Signed, expiring URLs</td><td>HMAC-SHA256, constant-time verify, <code>expires</code>, forged/expired &rarr; <b>403</b></td></tr>
               <tr><td>Registry-only resolution</td><td>Arbitrary file paths are structurally impossible to request</td></tr>
               <tr><td>Cache + security headers</td><td><code>immutable</code> caching, correct MIME, <code>nosniff</code>, no wildcard CORS</td></tr>
@@ -316,6 +316,10 @@
         <div class="code">composer require shamimstack/asset-shield
 npm install --save-dev @asset-shield/vite-plugin</div>
         <div class="code">php artisan asset-shield:install      <span class="d"># publish config, create paths, show Vite setup</span></div>
+        <p><b>Zero-config by default</b>: install, add the plugin, and <code>AssetShield::script()/style()</code> work
+          out of the box. Everything is off unless you turn it on — masking, obfuscation, protected runtime
+          delivery, CSP — and defaults match across the PHP side and the Vite plugin (seeds, legend path,
+          output dir), so a fresh install &ldquo;just works&rdquo; without synchronising anything.</p>
         <h3>Add the plugin to vite.config.js</h3>
         <div class="code"><span class="d">import</span> { defineConfig } <span class="d">from</span> <span class="c">'vite'</span>;
 <span class="d">import</span> laravel <span class="d">from</span> <span class="c">'laravel-vite-plugin'</span>;
@@ -334,6 +338,15 @@ npm install --save-dev @asset-shield/vite-plugin</div>
         <div class="code">npm run build
 php artisan asset-shield:build        <span class="d"># validate manifest, write registry</span>
 php artisan asset-shield:status</div>
+        <h3>Uninstall</h3>
+        <div class="code">composer remove shamimstack/asset-shield     <span class="d"># unregisters the provider (auto-discovery)</span>
+npm uninstall --save-dev @asset-shield/vite-plugin</div>
+        <p>Composer and npm only remove the packages. Then, manually: delete the published
+          <code>config/asset-shield.php</code>, remove <code>assetShieldVite()</code> from your
+          <code>vite.config</code>, revert <code>@shieldVite(...)</code> to <code>@vite(...)</code> in
+          Blade (and drop any <code>@assetShield*</code> directives), and delete
+          <code>storage/app/asset-shield/</code> (registry + legend build artifacts). There is no
+          artisan uninstall command.</p>
         <p>Follow the <a href="installation.html">step-by-step installation guide</a> for the full
           walkthrough, including opt-in masking and obfuscation.</p>
       </div>
@@ -345,7 +358,7 @@ php artisan asset-shield:status</div>
 <span class="c">@assetShield</span>(<span class="c">'resources/js/app.js'</span>)
 
 <span class="d">// Or the PHP API</span>
-{!! <span class="g">AssetShield::script</span>(<span class="c">'resources/js/app.js'</span>) !!}   <span class="d">// &lt;script src="/assets/7f92a8c1?...">&lt;/script></span>
+{!! <span class="g">AssetShield::script</span>(<span class="c">'resources/js/app.js'</span>) !!}   <span class="d">// &lt;script src="/assets/as_2ae34e8b0c462491?...">&lt;/script></span>
 {!! <span class="g">AssetShield::style</span>(<span class="c">'resources/css/app.css'</span>) !!}  <span class="d">// &lt;link rel="stylesheet" href="/assets/..."></span>
 <span class="g">AssetShield::url</span>(<span class="c">'resources/js/app.js'</span>, signed: <span class="g">true</span>, expires: now()->addMinutes(<span class="y">10</span>));
 
@@ -361,14 +374,14 @@ php artisan asset-shield:status</div>
 <span class="c">'build'</span>      => [
     <span class="c">'out_dir'</span>     => <span class="c">'build'</span>,
     <span class="c">'manifest'</span>    => <span class="c">'public/build/manifest.json'</span>,
-    <span class="c">'registry'</span>    => <span class="c">'storage/app/asset-shield/registry.json'</span>,
+    <span class="c">'registry'</span>    => <span class="c">'app/asset-shield/registry.json'</span>,
     <span class="c">'source_maps'</span> => <span class="g">false</span>,
 ],
 <span class="c">'mask'</span> => [<span class="c">'enabled'</span> => <span class="g">false</span>, <span class="c">'strategy'</span> => <span class="c">'preserve'</span>, <span class="c">'seed'</span> => <span class="c">''</span>, <span class="c">'legend'</span> => <span class="c">'app/asset-shield/legend.json'</span>],
-<span class="c">'obfuscation'</span>=> [<span class="c">'enabled'</span> => <span class="g">false</span>, <span class="c">'preset'</span> => <span class="c">'balanced'</span>, <span class="c">'engine'</span> => <span class="c">'javascript-obfuscator'</span>, <span class="c">'exclude_vendor'</span> => <span class="g">true</span>],
+<span class="c">'obfuscation'</span>=> [<span class="c">'enabled'</span> => <span class="g">false</span>, <span class="c">'preset'</span> => <span class="c">'balanced'</span>, <span class="c">'exclude_vendor'</span> => <span class="g">true</span>],
 <span class="c">'runtime'</span>    => [<span class="c">'enabled'</span> => <span class="g">false</span>, <span class="c">'route_prefix'</span> => <span class="c">'assets'</span>, <span class="c">'signed_urls'</span> => <span class="g">true</span>, <span class="c">'expires'</span> => <span class="y">300</span>],
 <span class="c">'delivery'</span>   => [<span class="c">'driver'</span> => <span class="c">'public'</span>],
-<span class="c">'cache'</span>      => [<span class="c">'enabled'</span> => <span class="g">true</span>, <span class="c">'max_age'</span> => <span class="y">31536000</span>],
+<span class="c">'cache'</span>      => [<span class="c">'enabled'</span> => env(<span class="c">'ASSET_SHIELD_CACHE'</span>, <span class="g">true</span>), <span class="c">'max_age'</span> => env(<span class="c">'ASSET_SHIELD_CACHE_MAX_AGE'</span>, <span class="y">31536000</span>)],
 <span class="c">'security'</span>   => [<span class="c">'csp'</span> => <span class="g">false</span>, <span class="c">'allowlist'</span> => [<span class="c">'script'</span> => [], <span class="c">'style'</span> => [], <span class="c">'img'</span> => []]]</div>
       </div>
 
@@ -478,7 +491,7 @@ npm test</div>
       <div class="doc-sec reveal">
         <h2><span class="num">11</span>License &amp; status</h2>
         <ul>
-          <li><b>Version:</b> 0.1.0 (MVP) &middot; <a href="../CHANGELOG.md">CHANGELOG</a></li>
+          <li><b>Version:</b> 0.2.0 &middot; <a href="../CHANGELOG.md">CHANGELOG</a></li>
           <li><b>License:</b> MIT (see <a href="../LICENSE">LICENSE</a>)</li>
           <li><b>Composer package:</b> <code>shamimstack/asset-shield</code> &middot; <b>Vite plugin:</b> <code>@asset-shield/vite-plugin</code></li>
         </ul>
@@ -538,7 +551,7 @@ npm test</div>
       </div>
     </div>
     <div class="foot-bottom">
-      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
+      <p>v0.2.0 &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
       <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
         exposure, protects asset access, and increases the cost of reverse engineering.</p>
     </div>

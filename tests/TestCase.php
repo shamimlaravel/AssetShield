@@ -16,7 +16,6 @@ use Shamimstack\AssetShield\Delivery\PublicDriver;
 use Shamimstack\AssetShield\Delivery\StreamDriver;
 use Shamimstack\AssetShield\Http\Controllers\AssetController;
 use Shamimstack\AssetShield\Http\Middleware\VerifyAssetSignature;
-use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
 use Shamimstack\AssetShield\Security\Csp;
 use Shamimstack\AssetShield\Signer\AssetSigner;
 
@@ -53,6 +52,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('asset-shield.delivery.driver', 'public');
         $app['config']->set('asset-shield.cache.max_age', 31536000);
         $app['config']->set('asset-shield.cache.enabled', true);
+        $app['config']->set('cache.default', 'array');
     }
 
     protected function setUp(): void
@@ -108,7 +108,6 @@ abstract class TestCase extends Orchestra
             AssetRegistry::class,
             Legend::class,
             Csp::class,
-            ObfuscationEngine::class,
             AssetResolver::class,
             AssetResponse::class,
             AssetSigner::class,

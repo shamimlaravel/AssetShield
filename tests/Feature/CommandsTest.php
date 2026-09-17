@@ -129,6 +129,23 @@ it('doctor fails when the registry is missing', function () {
         ->assertExitCode(1);
 });
 
+it('doctor flags a structurally invalid registry', function () {
+    $tmp = storage_path('poisoned-registry-doctor.json');
+    file_put_contents($tmp, json_encode([
+        'version' => 1,
+        'assets' => ['app.js' => ['file' => '../../.env', 'type' => 'script']],
+    ], JSON_PRETTY_PRINT));
+
+    config()->set('asset-shield.build.registry', $tmp);
+    $this->reloadAssetShield();
+
+    $this->artisan('asset-shield:doctor')
+        ->assertExitCode(1)
+        ->expectsOutputToContain('Asset registry invalid');
+
+    @unlink($tmp);
+});
+
 it('doctor fails when source maps are enabled', function () {
     config()->set('asset-shield.build.source_maps', true);
     $this->reloadAssetShield();

@@ -11,10 +11,34 @@ it('builds signed URLs by default', function () {
         ->and($url)->not->toContain('app-A91Kx.js');
 });
 
-it('builds unsigned URLs when forced', function () {
+it('still signs when URL signing is enforced and unsigned is requested', function () {
     $url = app(AssetUrlGenerator::class)->url('resources/js/app.js', signed: false);
 
+    expect($url)->toStartWith('/assets/'.opaqueFor('resources/js/app.js').'?expires=')
+        ->and($url)->toContain('signature=')
+        ->and($url)->not->toContain('app-A91Kx.js');
+});
+
+it('builds unsigned URLs when signing is disabled globally', function () {
+    config()->set('asset-shield.runtime.signed_urls', false);
+    $this->reloadAssetShield();
+    $this->bootstrapRegistry();
+
+    $url = app(AssetUrlGenerator::class)->url('resources/js/app.js');
+
     expect($url)->toBe('/assets/'.opaqueFor('resources/js/app.js'));
+});
+
+it('forces a signed URL even when signing is disabled globally', function () {
+    config()->set('asset-shield.runtime.signed_urls', false);
+    $this->reloadAssetShield();
+    $this->bootstrapRegistry();
+
+    $url = app(AssetUrlGenerator::class)->url('resources/js/app.js', signed: true);
+
+    expect($url)->toStartWith('/assets/')
+        ->and($url)->toContain('expires=')
+        ->and($url)->toContain('signature=');
 });
 
 it('honours a custom expiry timestamp', function () {
@@ -22,6 +46,13 @@ it('honours a custom expiry timestamp', function () {
     $url = app(AssetUrlGenerator::class)->url('resources/js/app.js', signed: true, expires: $expires);
 
     expect($url)->toContain('expires='.$expires);
+});
+
+it('accepts a DateTimeInterface (Carbon) expiry', function () {
+    $expires = now()->addMinutes(10);
+    $url = app(AssetUrlGenerator::class)->url('resources/js/app.js', expires: $expires);
+
+    expect($url)->toContain('expires='.$expires->getTimestamp());
 });
 
 it('throws when generating a URL for an unknown logical entry', function () {

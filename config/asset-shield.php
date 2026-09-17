@@ -36,7 +36,8 @@ return [
     | out_dir      Directory (relative to the public root) where Vite writes the
     |              built assets — used to resolve compiled files from the registry.
     | manifest     Vite manifest location (relative to the Laravel base path).
-    | registry     AssetShield registry (must stay outside public/).
+    | registry     AssetShield registry (must stay outside public/). Defaults to
+    |              storage/app/asset-shield/registry.json.
     | source_maps  Whether hostable source maps are produced. Defaults to false;
     |              when enabled a prominent warning is logged. Never "hidden".
     |
@@ -45,7 +46,7 @@ return [
     'build' => [
         'out_dir' => env('ASSET_SHIELD_BUILD_OUT_DIR', 'build'),
         'manifest' => env('ASSET_SHIELD_MANIFEST_PATH', 'public/build/manifest.json'),
-        'registry' => env('ASSET_SHIELD_REGISTRY_PATH', 'storage/app/asset-shield/registry.json'),
+        'registry' => env('ASSET_SHIELD_REGISTRY_PATH', 'app/asset-shield/registry.json'),
         'source_maps' => env('ASSET_SHIELD_SOURCE_MAPS', false),
     ],
 
@@ -67,9 +68,11 @@ return [
     | include/  Globs constraining which files participate in masking.
     | exclude   Files outside them keep their Vite names. An empty include list
     |           masks everything, matching the plugin.
-    | dictionary Shared codename wordlist theme for generator lookups.
     | legend    Secret legend mapping logical -> { original, masked }.
     |           MUST stay outside public/ (never routed, never served).
+    |           Relative paths resolve under storage_path(), so the default
+    |           above means storage/app/asset-shield/legend.json — the same
+    |           file the Vite plugin writes by default.
     |
     | Masking names are deterministic and presentational; they are NOT
     | encryption and must not be mistaken for a security boundary.
@@ -83,31 +86,27 @@ return [
         'aliases' => [],
         'include' => [],
         'exclude' => [],
-        'dictionary' => env('ASSET_SHIELD_MASK_DICTIONARY', 'default'),
         'legend' => env('ASSET_SHIELD_LEGEND_PATH', 'app/asset-shield/legend.json'),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Optional JS obfuscation (configured on the build side)
+    | Optional JS obfuscation (configured and applied on the build side)
     |--------------------------------------------------------------------------
     |
     | These keys mirror what the Vite plugin reads from its own options. They
-    | are informational for the PHP side (`asset-shield:status` / `:doctor`)
-    | and are disabled by default. Obfuscation is NOT encryption: it raises the
-    | cost of reverse engineering but cannot make client-delivered code
-    | un-inspectable.
+    | are informational for the PHP side (`asset-shield:status` / `:doctor`);
+    | the obfuscation itself is native to `@asset-shield/vite-plugin` and no
+    | PHP engine exists. Disabled by default. Obfuscation is NOT encryption:
+    | it raises the cost of reverse engineering but cannot make client-
+    | delivered code un-inspectable.
     |
     */
 
     'obfuscation' => [
         'enabled' => env('ASSET_SHIELD_OBFUSCATION', false),
         'preset' => env('ASSET_SHIELD_OBFUSCATION_PRESET', 'balanced'),
-        'engine' => env('ASSET_SHIELD_OBFUSCATION_ENGINE', 'javascript-obfuscator'),
         'exclude_vendor' => env('ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR', true),
-        'node_binary' => env('ASSET_SHIELD_OBFUSCATION_NODE', 'node'),
-        'package_path' => env('ASSET_SHIELD_OBFUSCATION_PACKAGE', ''),
-        'timeout' => (float) env('ASSET_SHIELD_OBFUSCATION_TIMEOUT', 120.0),
     ],
 
     /*
@@ -179,7 +178,13 @@ return [
     | HTTP caching for immutable production assets
     |--------------------------------------------------------------------------
     |
-    | enabled: emit Cache-Control headers.
+    | enabled: emit Cache-Control headers. When `asset-shield.environment` is
+    |          "production" the same switch also serves the decoded manifest and
+    |          registry payloads through the Laravel cache (Cache facade), so cold
+    |          requests never hit the filesystem. Set ASSET_SHIELD_CACHE=false to
+    |          disable both. Entries are keyed by artifact path and validated
+    |          against the artifact's mtime, so a rebuild never serves a stale
+    |          decode — even when the explicit purge was missed.
     | max_age: seconds for unsigned immutable assets (1 year by default).
     | For signed/expiring assets the max-age is clamped to the remaining
     | lifetime so a browser never caches beyond the signature expiry.
@@ -187,7 +192,7 @@ return [
     */
 
     'cache' => [
-        'enabled' => true,
+        'enabled' => env('ASSET_SHIELD_CACHE', true),
         'max_age' => env('ASSET_SHIELD_CACHE_MAX_AGE', 31536000),
     ],
 

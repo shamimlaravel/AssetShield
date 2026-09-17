@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Exceptions;
 
 use RuntimeException;
@@ -7,7 +9,7 @@ use RuntimeException;
 /**
  * Thrown when the Laravel/Vite production manifest cannot be found or parsed.
  */
-class ManifestNotFoundException extends RuntimeException
+final class ManifestNotFoundException extends RuntimeException
 {
     public static function missing(string $path): self
     {

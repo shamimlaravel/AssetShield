@@ -5,8 +5,8 @@ facade. Both resolve the same way under the hood:
 
 ```
 logical entry          compiled file          opaque identifier
-resources/js/app.js  → build/assets/app-A91Kx.js → 7f92a8c1
-resources/css/app.css → build/assets/app.css-8e3f2a.css → c21b7e66
+resources/js/app.js  → build/assets/app-A91Kx.js → as_2ae34e8b0c462491
+resources/css/app.css → build/assets/app.css-8e3f2a.css → as_9f7c1d2e69b8a534
 ```
 
 ## Blade directives
@@ -17,10 +17,10 @@ Resolves the entry through the registry and renders the appropriate tag:
 
 ```blade
 @assetShield('resources/js/app.js')
-{{-- <script src="/assets/7f92a8c1?expires=...&signature=..."></script> --}}
+{{-- <script src="/assets/as_2ae34e8b0c462491?expires=...&signature=..."></script> --}}
 
 @assetShield('resources/css/app.css')
-{{-- <link rel="stylesheet" href="/assets/c21b7e66?..."> --}}
+{{-- <link rel="stylesheet" href="/assets/as_9f7c1d2e69b8a534?..."> --}}
 ```
 
 The tag type (script vs. stylesheet) is inferred from the file type in the registry.
@@ -29,10 +29,10 @@ The tag type (script vs. stylesheet) is inferred from the file type in the regis
 
 ```blade
 @assetShieldCss('resources/css/app.css')
-{{-- <link rel="stylesheet" href="/assets/c21b7e66?..."> --}}
+{{-- <link rel="stylesheet" href="/assets/as_9f7c1d2e69b8a534?..."> --}}
 
 @assetShieldJs('resources/js/app.js')
-{{-- <script src="/assets/7f92a8c1?..."></script> --}}
+{{-- <script src="/assets/as_2ae34e8b0c462491?..."></script> --}}
 ```
 
 ## PHP facade
@@ -41,40 +41,43 @@ The tag type (script vs. stylesheet) is inferred from the file type in the regis
 use Shamimstack\AssetShield\Facades\AssetShield;
 ```
 
-### `AssetShield::url(string $entry, ?string $extra = '') : string`
+### `AssetShield::url(string $entry, ?bool $signed = null, int|\DateTimeInterface|null $expires = null) : string`
 
-Returns the protected URL (optionally signed):
+Returns the protected URL (optionally signed). `$expires` accepts an absolute Unix timestamp or any
+`DateTimeInterface` (Carbon is fine):
 
 ```php
 AssetShield::url('resources/js/app.js');
-// /assets/7f92a8c1?expires=1790000000&signature=ac42b8…
+// /assets/as_2ae34e8b0c462491?expires=1790000000&signature=ac42b8…
 
-AssetShield::url('resources/js/app.js', ['flavor' => 'dark']);
-// client-side usable signatures are NOT supported — see signed URLs for the safe API
+AssetShield::url('resources/js/app.js', expires: now()->addMinutes(10));
+// signed URL with a ten-minute lifetime
 ```
 
 ### `AssetShield::script(string $entry) : string`
 
 ```php
 {!! AssetShield::script('resources/js/app.js') !!}
-// <script src="/assets/7f92a8c1?expires=…&signature=…"></script>
+// <script src="/assets/as_2ae34e8b0c462491?expires=…&signature=…"></script>
 ```
 
 ### `AssetShield::style(string $entry) : string`
 
 ```php
 {!! AssetShield::style('resources/css/app.css') !!}
-// <link rel="stylesheet" href="/assets/c21b7e66?expires=…&signature=…">
+// <link rel="stylesheet" href="/assets/as_9f7c1d2e69b8a534?expires=…&signature=…">
 ```
 
 ### `AssetShield::resolve(string $entry)`
 
-Returns the compiled metadata (relative path, opaque ID, mime type) without rendering HTML — useful
-for custom markup:
+Returns the compiled metadata (relative file path, original pre-mask path, opaque ID, type, integrity,
+mime type and URL) without rendering HTML — useful for custom markup:
 
 ```php
 AssetShield::resolve('resources/js/app.js');
-// ['compiled' => 'build/assets/app-A91Kx.js', 'opaque' => '7f92a8c1', 'type' => 'js']
+// ['file' => 'build/assets/app-A91Kx.js', 'original' => 'build/assets/app-A91Kx.js',
+//  'opaque' => 'as_2ae34e8b0c462491', 'type' => 'script', 'integrity' => null,
+//  'mime' => 'text/javascript', 'url' => '/assets/as_2ae34e8b0c462491?expires=…&signature=…']
 ```
 
 Unknown entries throw `AssetNotFoundException` and the message includes the entry name and manifest
@@ -107,8 +110,9 @@ it always has, so rollback is a one-line config change.
 ## Cache & signature notes
 
 - Emitted URLs include `expires` + `signature` when `runtime.signed_urls=true`.
-- Unsigned URLs are produced when signatures are disabled or when you call
-  `AssetShield::url($entry, signed: false)`.
+- Unsigned URLs are produced when `runtime.signed_urls=false`; pass `signed: true` for an explicit
+  per-call signature. When signing is enforced by config, requesting `signed: false` still yields a
+  signed URL — the delivery middleware verifies signatures, so the global config wins.
 - The browser receives **only** the opaque ID; the real compiled filename never appears in HTML.
 
 ## Learn more

@@ -1,5 +1,7 @@
+export type RegistryType = 'script' | 'style' | 'image' | 'font';
+
 export interface RegistryAsset {
-    type: 'script' | 'style';
+    type: RegistryType;
     /** Compiled file path relative to the public root, e.g. build/assets/8f4a1c7d.js */
     file: string;
     /** Pre-mask compiled file path relative to the public root (renamed assets only). */
@@ -44,8 +46,26 @@ function normalizeSlashes(path: string): string {
     return path.replace(/\\/g, '/');
 }
 
-function classify(file: string): RegistryAsset['type'] {
-    return file.toLowerCase().endsWith('.css') ? 'style' : 'script';
+/**
+ * Mirrors the PHP side (MimeMapper::family): css -> style, js/mjs/cjs ->
+ * script, image extensions -> image, font extensions -> font, unknown -> script.
+ */
+function classify(file: string): RegistryType {
+    const extension = file.toLowerCase().slice(file.lastIndexOf('.') + 1);
+
+    if (extension === 'css') {
+        return 'style';
+    }
+
+    if (['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico'].includes(extension)) {
+        return 'image';
+    }
+
+    if (['woff', 'woff2', 'ttf', 'otf', 'eot'].includes(extension)) {
+        return 'font';
+    }
+
+    return 'script';
 }
 
 /**

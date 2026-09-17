@@ -7,7 +7,10 @@ import { mergeOptions, type ObfuscationPreset, type ObfuscatorOptions } from './
 
 export type ObfuscatorOutput = string | { code: string; map?: string | null };
 
-export type Obfuscator = (source: string, options?: Record<string, unknown>) => ObfuscatorOutput;
+export type Obfuscator = (
+    source: string,
+    options?: Record<string, unknown>,
+) => ObfuscatorOutput | Promise<ObfuscatorOutput>;
 
 export interface ObfuscationResult {
     code: string;
@@ -72,10 +75,85 @@ async function subprocessObfuscator(
     }
 }
 
+interface JavaScriptObfuscatorApi {
+    obfuscate(source: string, options?: Record<string, unknown>): {
+        code?: string;
+        map?: string | null;
+        getObfuscatedCode?: () => string | Promise<string>;
+        getSourceMap?: () => string | null | { toString(): string } | Promise<string | null | { toString(): string }>;
+    } | null;
+}
+
+/**
+ * Fast path: require `javascript-obfuscator` once, in-process, and transform
+ * every chunk directly in the build. This avoids spawning a Node subprocess and
+ * writing temp files per chunk. Yields null when the optional peer dependency
+ * cannot be loaded, in which case the subprocess loader keeps working as a
+ * fallback for exotic environments.
+ *
+ * The result of a single module lookup is cached for the process lifetime.
+ */
+let inProcessApi: JavaScriptObfuscatorApi | null | undefined;
+
+async function inProcessObfuscator(): Promise<Obfuscator | null> {
+    if (inProcessApi === undefined) {
+        try {
+            const requirer = createRequire(typeof __filename !== 'undefined' ? __filename : import.meta.url);
+            const api = requirer('javascript-obfuscator') as JavaScriptObfuscatorApi;
+
+            inProcessApi = typeof api?.obfuscate === 'function' ? api : null;
+        } catch {
+            inProcessApi = null;
+        }
+    }
+
+    if (inProcessApi === null) {
+        return null;
+    }
+
+    return async (source: string, options?: Record<string, unknown>): Promise<ObfuscatorOutput> => {
+        const result = inProcessApi?.obfuscate(source, options ?? {});
+
+        if (result === null || result === undefined || typeof result !== 'object') {
+            return String(result);
+        }
+
+        const rawCode = typeof result.getObfuscatedCode === 'function'
+            ? result.getObfuscatedCode()
+            : typeof result.code === 'string'
+              ? result.code
+              : '';
+
+        const code = (await rawCode) ?? '';
+
+        if (typeof code !== 'string' || code.length === 0) {
+            return '';
+        }
+
+        let map: string | null = null;
+
+        if (typeof result.getSourceMap === 'function') {
+            // `separate` mode: js-obfuscator hands back the raw map. Depending
+            // on the version this is a string, a {toString()} wrapper, or a
+            // promise of either.
+            const rawMap = await result.getSourceMap();
+
+            if (typeof rawMap === 'string') {
+                map = rawMap.length > 0 ? rawMap : null;
+            } else if (rawMap !== null && typeof rawMap === 'object') {
+                const serialized = String(rawMap);
+                map = serialized.length > 0 ? serialized : null;
+            }
+        } else if (typeof result.map === 'string') {
+            map = result.map;
+        }
+
+        return map === null ? code : { code, map };
+    };
+}
+
 function defaultLoader(): Promise<Obfuscator | null> {
-    return Promise.resolve(
-        subprocessObfuscator as unknown as Obfuscator,
-    );
+    return inProcessObfuscator().then((inProcess) => inProcess ?? subprocessObfuscator);
 }
 
 export class ObfuscationEngine {

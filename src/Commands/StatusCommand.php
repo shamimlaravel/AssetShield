@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Commands;
 
 use Illuminate\Console\Command;
 use Shamimstack\AssetShield\AssetShieldManager;
-use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
 
 class StatusCommand extends Command
 {
@@ -12,7 +13,7 @@ class StatusCommand extends Command
 
     protected $description = 'Print the AssetShield configuration snapshot';
 
-    public function handle(AssetShieldManager $manager, ObfuscationEngine $engine): int
+    public function handle(AssetShieldManager $manager): int
     {
         $status = $manager->status();
         $obfuscationEnabled = (bool) $status['obfuscation_enabled'];
@@ -35,7 +36,6 @@ class StatusCommand extends Command
         $this->line(sprintf('  %-20s %s', 'Expiration:', $status['expires'].'s'));
         $this->line(sprintf('  %-20s %s', 'Masking:', $status['mask_enabled'] ? $status['mask_strategy'] : 'disabled'));
         $this->line(sprintf('  %-20s %s', 'Obfuscation:', $obfuscationEnabled ? $status['obfuscation_preset'] : 'disabled'));
-        $this->line(sprintf('  %-20s %s', '  . engine:', $engine->isAvailable() ? $this->yesNo(true) : 'not found'));
         $this->line(sprintf('  %-20s %s', 'Source Maps:', $this->yesNo($status['source_maps'])));
         $this->line(sprintf('  %-20s %s', 'Driver:', $status['driver']));
 
@@ -47,6 +47,9 @@ class StatusCommand extends Command
         return $value ? 'yes' : 'no';
     }
 
+    /**
+     * @param  array<string, mixed>  $status
+     */
     private function registryState(array $status): string
     {
         if (! $status['registry_found']) {

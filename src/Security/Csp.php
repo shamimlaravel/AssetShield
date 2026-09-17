@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Security;
 
 /**
@@ -84,6 +86,8 @@ class Csp
      * Strict, nonce-free policy for binary asset responses: by the time a
      * client executes bytes it has already passed every check, so the asset
      * itself never needs inline script allowances.
+     *
+     * @return array<string, string>
      */
     public function headersForAsset(): array
     {

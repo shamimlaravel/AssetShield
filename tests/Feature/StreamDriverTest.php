@@ -3,6 +3,21 @@
 use Shamimstack\AssetShield\AssetIdentity;
 use Shamimstack\AssetShield\Delivery\StreamDriver;
 
+it('emits the same metadata ETag as the PublicDriver for the same file', function () {
+    $stream = app(StreamDriver::class);
+    $public = app(\Shamimstack\AssetShield\Delivery\PublicDriver::class);
+
+    $asset = new AssetIdentity('resources/js/app.js', 'build/assets/app-A91Kx.js', 'as_x', 'script');
+
+    $streamResponse = $stream->deliver($asset);
+    $publicResponse = $public->deliver($asset);
+
+    $expected = '"'.md5((string) filesize(public_path('build/assets/app-A91Kx.js')).'-'.(string) filemtime(public_path('build/assets/app-A91Kx.js'))).'"';
+
+    expect($streamResponse->headers->get('ETag'))->toBe($expected)
+        ->and($publicResponse->headers->get('ETag'))->toBe($expected);
+});
+
 it('streams a file via BinaryFileResponse with range support', function () {
     $driver = app(StreamDriver::class);
 

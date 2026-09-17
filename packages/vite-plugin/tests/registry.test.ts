@@ -63,6 +63,25 @@ describe('registry building', () => {
         });
     });
 
+    it('types assets by media family, mirroring the PHP MimeMapper::family', () => {
+        const registry = buildRegistry(
+            {
+                'resources/images/logo.svg': { file: 'assets/logo-B7x2a.svg' },
+                'resources/images/hero.png': { file: 'assets/hero-9q1m.png' },
+                'resources/fonts/open-sans.woff2': { file: 'assets/open-sans-4kZf.woff2' },
+                'resources/fonts/icon.eot': { file: 'assets/icon-2e83.eot' },
+                'resources/misc/data.json': { file: 'assets/data-x7d0.json' },
+            },
+            'build',
+        );
+
+        expect(registry.assets['resources/images/logo.svg'].type).toBe('image');
+        expect(registry.assets['resources/images/hero.png'].type).toBe('image');
+        expect(registry.assets['resources/fonts/open-sans.woff2'].type).toBe('font');
+        expect(registry.assets['resources/fonts/icon.eot'].type).toBe('font');
+        expect(registry.assets['resources/misc/data.json'].type).toBe('script');
+    });
+
     it('records pre-mask originals when the rename map is provided', () => {
         const renames = new Map<string, string>([
             ['assets/app-A91Kx.js', 'assets/a8bc3d21.js'],

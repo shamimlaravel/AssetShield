@@ -1,12 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 use Illuminate\Contracts\Foundation\Application;
 use InvalidArgumentException;
 use Shamimstack\AssetShield\Exceptions\RegistryInvalidException;
+use Shamimstack\AssetShield\Support\ArtifactCache;
 use Shamimstack\AssetShield\Support\MimeMapper;
 use Shamimstack\AssetShield\Support\OpaqueId;
+use Shamimstack\AssetShield\Support\Path;
 
 /**
  * Maps logical assets -> compiled files -> protected opaque identifiers.
@@ -30,14 +34,13 @@ use Shamimstack\AssetShield\Support\OpaqueId;
  * neither the Vite plugin nor the client ever sees the real compiled path or
  * the key. FNV-based mask names are presentational only and are never
  * used as security.
+ *
+ * @phpstan-type RegistryEntry = array{logical: string, file: string, original: string|null, opaque: string, type: string, integrity: string|null}
  */
 class AssetRegistry
 {
-    /** @var array<string, array{logical:string,file:string,original:?string,opaque:string,type:string,integrity:?string}> */
+    /** @var array<string, RegistryEntry> */
     private array $entries = [];
-
-    /** @var array<string,string> opaque -> logical */
-    private array $opaqueIndex = [];
 
     /** @var array<string,string> logical -> opaque */
     private array $logicalIndex = [];
@@ -47,18 +50,19 @@ class AssetRegistry
     public function __construct(
         private readonly string $registryPath,
         private readonly string $appKey,
+        private readonly ?Application $app = null,
     ) {
     }
 
     public static function fromConfig(Application $app): self
     {
-        $path = (string) $app['config']->get('asset-shield.build.registry', 'storage/app/asset-shield/registry.json');
+        $path = (string) $app['config']->get('asset-shield.build.registry', 'app/asset-shield/registry.json');
 
-        if ($path === '' || preg_match('/^[A-Za-z]:[\\\\\/]|^\//', $path) !== 1) {
+        if ($path === '' || ! Path::isAbsolute($path)) {
             $path = $app->storagePath($path);
         }
 
-        return new self($path, (string) $app['config']->get('app.key'));
+        return new self($path, (string) $app['config']->get('app.key'), $app);
     }
 
     public function path(): string
@@ -72,7 +76,8 @@ class AssetRegistry
     }
 
     /**
-     * Load the registry artifact (lazily, once per worker).
+     * Load the registry artifact (lazily, once per worker; served from the
+     * Laravel cache in production).
      *
      * @throws RegistryInvalidException
      */
@@ -86,9 +91,9 @@ class AssetRegistry
             throw RegistryInvalidException::missing($this->registryPath);
         }
 
-        $decoded = json_decode((string) file_get_contents($this->registryPath), true);
+        $decoded = $this->payload();
 
-        if (! is_array($decoded) || ! isset($decoded['assets']) || ! is_array($decoded['assets'])) {
+        if (! isset($decoded['assets']) || ! is_array($decoded['assets'])) {
             throw RegistryInvalidException::invalid($this->registryPath, 'missing "assets" map');
         }
 
@@ -107,7 +112,7 @@ class AssetRegistry
      * server-side opaque identifiers. Persists unless $persist is false.
      *
      * @param  array<int,array{logical:string,file:string,type:?string,integrity:?string,original:?string}>  $rows
-     * @return array<string, array{logical:string,file:string,original:?string,opaque:string,type:string,integrity:?string}>
+     * @return array<string, RegistryEntry>
      */
     public function create(array $rows, bool $persist = true): array
     {
@@ -115,8 +120,8 @@ class AssetRegistry
         $seenLogicals = [];
 
         foreach ($rows as $index => $row) {
-            $logical = (string) ($row['logical'] ?? '');
-            $file = (string) ($row['file'] ?? '');
+            $logical = (string) $row['logical'];
+            $file = (string) $row['file'];
 
             if ($logical === '' || $file === '' || ! OpaqueId::isSafe($file)) {
                 throw new InvalidArgumentException('AssetShield registry entries require a logical key and a safe file path (row #'.$index.').');
@@ -143,20 +148,22 @@ class AssetRegistry
             ];
         }
 
+        $this->setEntries($entries);
+        $this->loaded = true;
+
         if ($persist) {
             $this->save();
         }
 
-        $this->setEntries($entries);
-        $this->loaded = true;
-
         return $entries;
     }
 
+    /**
+     * @param  array<string, RegistryEntry>  $entries
+     */
     public function setEntries(array $entries): void
     {
         $this->entries = $entries;
-        $this->opaqueIndex = [];
         $this->logicalIndex = [];
 
         foreach ($entries as $entry) {
@@ -164,11 +171,13 @@ class AssetRegistry
                 continue;
             }
 
-            $this->opaqueIndex[$entry['opaque']] = $entry['logical'];
             $this->logicalIndex[$entry['logical']] = $entry['opaque'];
         }
     }
 
+    /**
+     * @return array<string, RegistryEntry>
+     */
     public function entries(): array
     {
         $this->ensureLoaded();
@@ -176,6 +185,9 @@ class AssetRegistry
         return $this->entries;
     }
 
+    /**
+     * @return RegistryEntry|null
+     */
     public function entryForOpaque(string $opaque): ?array
     {
         $this->ensureLoaded();
@@ -183,6 +195,9 @@ class AssetRegistry
         return $this->entries[$opaque] ?? null;
     }
 
+    /**
+     * @return RegistryEntry|null
+     */
     public function entryForLogical(string $logical): ?array
     {
         $this->ensureLoaded();
@@ -210,19 +225,10 @@ class AssetRegistry
     }
 
     /**
-     * Pre-mask compiled filename for a logical entry, or null when the
-     * asset was not renamed.
-     */
-    public function originalForLogical(string $logical): ?string
-    {
-        $entry = $this->entryForLogical($logical);
-
-        return $entry['original'] ?? null;
-    }
-
-    /**
      * Validate the registry both structurally and against the manifest/files.
      * Returns a list of human-readable problems (empty list = valid).
+     *
+     * @return list<string>
      */
     public function validate(AssetManifest $manifest, bool $checkFiles = true): array
     {
@@ -292,23 +298,83 @@ class AssetRegistry
             throw new \RuntimeException('AssetShield could not write the registry to "'.$this->registryPath.'".');
         }
 
+        $this->purgeCache();
+
         return count($this->entries);
     }
 
     /**
-     * Force a reload from disk on next access.
+     * Force a reload from disk on next access (and drop the production cache
+     * entry, when enabled).
      */
     public function refresh(): void
     {
         $this->loaded = false;
         $this->entries = [];
-        $this->opaqueIndex = [];
         $this->logicalIndex = [];
+        $this->purgeCache();
     }
 
     public function loaded(): bool
     {
         return $this->loaded;
+    }
+
+    /**
+     * Decoded registry payload, served from the Laravel cache in production and
+     * read from disk otherwise.
+     *
+     * @return array<string, mixed>
+     */
+    private function payload(): array
+    {
+        if (! $this->cacheEnabled()) {
+            return $this->readPayload();
+        }
+
+        $key = static::cacheKey($this->registryPath);
+        $cached = ArtifactCache::read($key, $this->registryPath);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $fresh = $this->readPayload();
+
+        ArtifactCache::write($key, $this->registryPath, $fresh);
+
+        return $fresh;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readPayload(): array
+    {
+        $decoded = json_decode((string) file_get_contents($this->registryPath), true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function cacheEnabled(): bool
+    {
+        return $this->app !== null && ArtifactCache::enabled($this->app);
+    }
+
+    private function purgeCache(): void
+    {
+        if ($this->cacheEnabled()) {
+            ArtifactCache::forget(static::cacheKey($this->registryPath));
+        }
+    }
+
+    /**
+     * The Laravel-cache key holding the decoded registry. Keyed by resolved
+     * path so different installs/builds never share a payload.
+     */
+    public static function cacheKey(string $path): string
+    {
+        return ArtifactCache::key('registry', $path);
     }
 
     private function ensureLoaded(): void
@@ -318,6 +384,10 @@ class AssetRegistry
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return RegistryEntry
+     */
     private function normalizeRaw(string $logical, array $raw): array
     {
         $file = (string) ($raw['file'] ?? '');
@@ -337,13 +407,29 @@ class AssetRegistry
             throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.$logical.'" has a stored opaque id that does not match the application key.');
         }
 
+        $original = $raw['original'] ?? null;
+        $integrity = $raw['integrity'] ?? null;
+        $type = $raw['type'] ?? null;
+
+        if ($original !== null && ! is_string($original)) {
+            throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.$logical.'" has a non-string "original".');
+        }
+
+        if ($integrity !== null && ! is_string($integrity)) {
+            throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.$logical.'" has a non-string "integrity".');
+        }
+
+        if ($type !== null && ! is_string($type)) {
+            throw RegistryInvalidException::invalid($this->registryPath, 'registry asset "'.$logical.'" has a non-string "type".');
+        }
+
         return [
             'logical' => $logical,
             'file' => OpaqueId::canonicalize($file),
-            'original' => isset($raw['original']) && (string) $raw['original'] !== '' ? (string) $raw['original'] : null,
+            'original' => $original === null || $original === '' ? null : $original,
             'opaque' => $expected,
-            'type' => (string) ($raw['type'] ?? MimeMapper::family($file)),
-            'integrity' => isset($raw['integrity']) ? (string) $raw['integrity'] : null,
+            'type' => $type === null || $type === '' ? MimeMapper::family($file) : $type,
+            'integrity' => $integrity === null || $integrity === '' ? null : $integrity,
         ];
     }
 }

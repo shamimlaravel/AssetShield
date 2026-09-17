@@ -24,20 +24,21 @@ manifest-resolved, build artifacts. Arbitrary file paths are structurally imposs
 ```
 BAD      GET /assets?file=../../.env          → rejected (no such parameter exists)
 BAD      GET /assets/../../.env               → route does not match
-GOOD     GET /assets/7f92a8c1                 → registry lookup → compiled file
+GOOD     GET /assets/as_2ae34e8b0c462491      → registry lookup → compiled file
 ```
 
 Path traversal, `.env` retrieval, storage/vendor traversal, and PHP-source reads are prevented at
 three layers:
 
-1. Route shape — the `{asset}` segment accepts only opaque IDs (`[a-f0-9]{8,32}`).
+1. Route shape — the `{asset}` segment accepts only protected opaque IDs (`[a-z0-9_]{2,64}`, i.e.
+   `as_` + hex); a filesystem path can never be matched.
 2. Registry-only resolution — ID → relative compiled path; no user string is ever treated as a path.
 3. Filesystem confinement — compiled paths are canonicalized against the public build root; any
    escape resolves to 404.
 
 ### 2. URL abstraction
 
-Users see `/assets/7f92a8c1`, never `/build/assets/app-A91Kx.js`, and with optional *masking* they
+Users see `/assets/as_2ae34e8b0c462491`, never `/build/assets/app-A91Kx.js`, and with optional *masking* they
 no longer even see `app-A91Kx.js` — build-time filename renaming (`nameless` hashes or `codename`
 words) removes framework fingerprints and module boundaries from every served filename. Masking is
 **presentational, not cryptographic**; it pairs with the opaque-URL scheme, it does not replace it.

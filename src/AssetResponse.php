@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Builds HTTP responses for protected assets with correct MIME types,
@@ -22,16 +25,20 @@ class AssetResponse
     }
 
     /**
-     * In-memory content response (used by PublicDriver).
+     * In-memory content response (used by PublicDriver). The ETag is derived
+     * from the on-disk file metadata when a source path is available so both
+     * drivers emit an identical ETag for the same asset; otherwise it falls
+     * back to a content hash.
      */
     public function fromContents(
         string $contents,
         string $contentType,
         ?int $cacheOverrideSeconds = null,
         bool $immutable = true,
+        ?string $sourcePath = null,
     ): Response {
         $response = new Response($contents, 200);
-        $response->header('ETag', '"'.md5($contents).'"');
+        $response->headers->set('ETag', $sourcePath !== null ? self::etagForPath($sourcePath) : '"'.md5($contents).'"');
 
         $this->decorate($response, $contentType, $cacheOverrideSeconds, $immutable);
 
@@ -50,16 +57,26 @@ class AssetResponse
     ): BinaryFileResponse {
         $response = new BinaryFileResponse($path, 200, headers: [], public: true, contentDisposition: 'inline');
 
-        $size = @filesize($path);
-        $mtime = @filemtime($path);
-        $response->headers->set('ETag', '"'.md5((string) $size.'-'.(string) $mtime).'"');
+        $response->headers->set('ETag', self::etagForPath($path));
 
         $this->decorate($response, $contentType, $cacheOverrideSeconds, $immutable);
 
         return $response;
     }
 
-    private function decorate($response, string $contentType, ?int $cacheOverrideSeconds, bool $immutable): void
+    /**
+     * Metadata-based ETag (size + mtime) for a file on disk. Using the same
+     * derivation in both drivers keeps ETags stable and interchangeable.
+     */
+    private static function etagForPath(string $path): string
+    {
+        $size = @filesize($path);
+        $mtime = @filemtime($path);
+
+        return '"'.md5((string) $size.'-'.(string) $mtime).'"';
+    }
+
+    private function decorate(SymfonyResponse $response, string $contentType, ?int $cacheOverrideSeconds, bool $immutable): void
     {
         $response->headers->set('Content-Type', $contentType);
         $response->headers->set('X-Content-Type-Options', 'nosniff');

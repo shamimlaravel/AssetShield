@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield;
 
 use Shamimstack\AssetShield\Exceptions\AssetNotFoundException;
@@ -20,6 +22,9 @@ use Shamimstack\AssetShield\Signer\AssetSigner;
  */
 class AssetShieldManager
 {
+    /**
+     * @param  array<string, mixed>  $config
+     */
     public function __construct(
         private readonly AssetRegistry $registry,
         private readonly AssetManifest $manifest,
@@ -46,6 +51,8 @@ class AssetShieldManager
 
     /**
      * Resolved metadata for an entry (file, opaque, type, mime, url).
+     *
+     * @return array{file: string, original: string|null, opaque: string, type: string, integrity: string|null, mime: string|null, url: string}
      */
     public function resolve(string $entry): array
     {
@@ -74,16 +81,16 @@ class AssetShieldManager
      * URL for a logical entry. When AssetShield is disabled this falls back to
      * the plain Vite/public URL; when runtime delivery is off the web server
      * serves the same public path directly.
+     *
+     * @param  bool|null  $signed   null = follow config, true = force signed,
+     *                              false = attempt unsigned (config wins when
+     *                              signing is enforced).
+     * @param  int|\DateTimeInterface|null  $expires  absolute Unix timestamp
+     *                              or a DateTimeInterface (Carbon is fine).
      */
-    public function url(string $entry, ?bool $signed = null, ?int $expires = null): string
+    public function url(string $entry, ?bool $signed = null, int|\DateTimeInterface|null $expires = null): string
     {
-        if (! $this->isEnabled()) {
-            $record = $this->manifest->resolve($entry);
-
-            return '/'.$this->manifest->compiledPath($record['file']);
-        }
-
-        if (! $this->runtimeEnabled()) {
+        if (! $this->isEnabled() || ! $this->runtimeEnabled()) {
             $record = $this->manifest->resolve($entry);
 
             return '/'.$this->manifest->compiledPath($record['file']);
@@ -98,16 +105,9 @@ class AssetShieldManager
             return '';
         }
 
-        $url = $this->url($entry);
-        $integrity = $this->integrityFor($entry);
+        $record = $this->recordFor($entry);
 
-        $attributes = 'src="'.e($url).'"';
-
-        if ($integrity !== null) {
-            $attributes .= ' integrity="'.e($integrity).'" crossorigin="anonymous"';
-        }
-
-        return '<script '.$attributes.'></script>';
+        return $this->scriptTag($record);
     }
 
     public function style(string $entry): string
@@ -116,16 +116,9 @@ class AssetShieldManager
             return '';
         }
 
-        $url = $this->url($entry);
-        $integrity = $this->integrityFor($entry);
+        $record = $this->recordFor($entry);
 
-        $attributes = 'rel="stylesheet" href="'.e($url).'"';
-
-        if ($integrity !== null) {
-            $attributes .= ' integrity="'.e($integrity).'" crossorigin="anonymous"';
-        }
-
-        return '<link '.$attributes.'>';
+        return $this->styleTag($record);
     }
 
     /**
@@ -137,21 +130,19 @@ class AssetShieldManager
             return '';
         }
 
-        $record = $this->registry->entryForLogical($entry);
+        $record = $this->recordFor($entry);
 
-        if ($record === null) {
-            throw AssetNotFoundException::fromRegistryEntry($entry);
-        }
-
-        return ($record['type'] ?? '') === 'style' ? $this->style($entry) : $this->script($entry);
+        return $record['type'] === 'style' ? $this->styleTag($record) : $this->scriptTag($record);
     }
 
     /**
-     * Convenience wrapper for Vite entry lists:
-     *   @shieldVite(['resources/css/app.css', 'resources/js/app.js'])
+     * Convenience wrapper for Vite entry lists. Pass the same entry points you
+     * would to @vite() — a single entry or an iterable of entries, e.g.
+     * shieldVite(["resources/css/app.css", "resources/js/app.js"]). Unregistered
+     * entries are skipped (with a log) instead of forced through AssetShield,
+     * keeping @vite() compatibility intact.
      *
-     * Unregistered entries are skipped (with a log) instead of forced through
-     * AssetShield, keeping @vite() compatibility intact.
+     * @param  iterable<array-key, string>  $entries
      */
     public function renderVite(iterable $entries): string
     {
@@ -162,19 +153,25 @@ class AssetShieldManager
         $html = '';
 
         foreach ($entries as $entry) {
-            if ($this->registry->entryForLogical((string) $entry) === null) {
+            $record = $this->registry->entryForLogical((string) $entry);
+
+            if ($record === null) {
                 logger()->warning('AssetShield skipped unregistered entry "'.(string) $entry.'" in @shieldVite().');
 
                 continue;
             }
 
-            $html .= $this->render((string) $entry);
+            $html .= $record['type'] === 'style' ? $this->styleTag($record) : $this->scriptTag($record);
         }
 
         return $html;
     }
 
-    public function sign(string $assetId, ?int $expires = null): string
+    /**
+     * @param  int|\DateTimeInterface|null  $expires  absolute Unix timestamp
+     *                              or a DateTimeInterface (Carbon is fine).
+     */
+    public function sign(string $assetId, int|\DateTimeInterface|null $expires = null): string
     {
         return $this->signer->sign($assetId, $expires);
     }
@@ -228,9 +225,64 @@ class AssetShieldManager
         return $this->manifest;
     }
 
-    private function integrityFor(string $entry): ?string
+    /**
+     * @return array{logical: string, file: string, original: string|null, opaque: string, type: string, integrity: string|null}
+     */
+    private function recordFor(string $entry): array
     {
-        return $this->registry->entryForLogical($entry)['integrity'] ?? null;
+        $record = $this->registry->entryForLogical($entry);
+
+        if ($record === null) {
+            throw AssetNotFoundException::fromRegistryEntry($entry);
+        }
+
+        return $record;
+    }
+
+    /**
+     * @param  array{logical: string, file: string, original: string|null, opaque: string, type: string, integrity: string|null}  $record
+     */
+    private function scriptTag(array $record): string
+    {
+        $url = $this->urlForTag($record);
+        $integrity = $record['integrity'] ?? null;
+
+        $attributes = 'src="'.e($url).'"';
+
+        if ($integrity !== null) {
+            $attributes .= ' integrity="'.e($integrity).'" crossorigin="anonymous"';
+        }
+
+        return '<script '.$attributes.'></script>';
+    }
+
+    /**
+     * @param  array{logical: string, file: string, original: string|null, opaque: string, type: string, integrity: string|null}  $record
+     */
+    private function styleTag(array $record): string
+    {
+        $url = $this->urlForTag($record);
+        $integrity = $record['integrity'] ?? null;
+
+        $attributes = 'rel="stylesheet" href="'.e($url).'"';
+
+        if ($integrity !== null) {
+            $attributes .= ' integrity="'.e($integrity).'" crossorigin="anonymous"';
+        }
+
+        return '<link '.$attributes.'>';
+    }
+
+    /**
+     * @param  array{logical: string, file: string, original: string|null, opaque: string, type: string, integrity: string|null}  $record
+     */
+    private function urlForTag(array $record): string
+    {
+        if ($this->runtimeEnabled()) {
+            return $this->urlGenerator->urlForOpaque($record['opaque']);
+        }
+
+        return '/'.$record['file'];
     }
 
     private function registryValid(): bool

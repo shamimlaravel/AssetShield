@@ -461,7 +461,7 @@
       <a href="#docs">Docs</a>
     </nav>
     <div style="display:flex;align-items:center;gap:.9rem">
-      <span class="version-pill">v0.1.0 MVP</span>
+      <span class="version-pill">v0.2.0</span>
       <a class="nav-cta" href="#install">Install</a>
       <button type="button" class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-overlay">
         <span></span><span></span><span></span>
@@ -520,7 +520,7 @@
           <div class="t-ln"><span class="t-prompt">$</span> <span class="t-strong">npm run build && php artisan asset-shield:build</span></div>
           <div class="t-ln t-ok" data-ty="2">✔ vite build ok · registry written · 12 assets</div>
           <div class="t-ln">&#160;</div>
-          <div class="t-ln"><span class="t-strong">GET</span> <span class="t-ok-cyan">/assets/7f92a8c1</span> <span class="t-dim">?expires=1790000000&amp;signature=…</span></div>
+          <div class="t-ln"><span class="t-strong">GET</span> <span class="t-ok-cyan">/assets/as_2ae34e8b0c462491</span> <span class="t-dim">?expires=1790000000&amp;signature=…</span></div>
           <div class="t-ln t-ok" data-ty="3">→ 200 text/javascript · immutable · nosniff</div>
           <div class="t-ln"><span class="t-strong">GET</span> <span class="t-ok-cyan">/assets?file=../../.env</span></div>
           <div class="t-ln t-err" data-ty="4">→ 403 — arbitrary paths do not exist here</div>
@@ -786,7 +786,7 @@
             the key rotates.</p>
           <div class="code"><span class="d">Blade</span>&nbsp;&nbsp;{!! AssetShield::script(<span class="g">'resources/js/app.js'</span>) !!}
 <span class="d">before</span>&nbsp;&nbsp;/build/assets/app-<span class="strike">A91Kx.js</span>
-<span class="d">after</span>&nbsp;&nbsp;<span class="c">/assets/7f92a8c1</span></div>
+<span class="d">after</span>&nbsp;&nbsp;<span class="c">/assets/as_2ae34e8b0c462491</span></div>
         </div>
 
         <div class="card reveal">
@@ -794,7 +794,7 @@
           <h3>Signed, expiring URLs</h3>
           <p>HMAC-SHA256 signatures with constant-time verification. Forged or expired links return
             HTTP 403.</p>
-          <div class="code"><span class="c">/assets/7f92a8c1</span>
+          <div class="code"><span class="c">/assets/as_2ae34e8b0c462491</span>
 ?expires=<span class="y">1790000000</span>
 &amp;signature=<span class="g">ac42b8…</span></div>
         </div>
@@ -831,8 +831,8 @@ public, max-age=<span class="g">31536000</span>, immutable
         <div class="card wide reveal">
           <span class="k">06 · Build pipeline</span>
           <h3>Obfuscation, opt-in and vendor-safe</h3>
-          <p>An adapter wraps <span class="mono">javascript-obfuscator</span>. Off by default; presets
-            from light to aggressive; vendor chunks skip by default; CSS is never touched.</p>
+          <p>Built into the Vite plugin, drives <span class="mono">javascript-obfuscator</span> natively. Off by
+            default; presets from light to aggressive; vendor chunks skip by default; CSS is never touched.</p>
           <div class="chips">
             <span class="chip on">light</span>
             <span class="chip on">balanced</span>
@@ -990,8 +990,10 @@ public, max-age=<span class="g">31536000</span>, immutable
 
           <div class="tab-panel" data-panel="obfuscate">
             <div class="detail-grid">
-              <div class="detail"><span class="k">Adapter design</span>
-                <p><code>ObfuscationEngine</code> drives javascript-obfuscator through a thin adapter. When the
+              <div class="detail"><span class="k">Native to the plugin</span>
+                <p><code>obfuscation/engine.ts</code> in the Vite plugin drives javascript-obfuscator
+                  directly, in-process (one required lookup per build, cached). There is no PHP-side
+                  engine; a subprocess fallback is used only when that in-process require fails. When the
                   package is missing, builds warn loudly — and with <code>failOnError</code> they fail rather
                   than silently shipping untouched code.</p></div>
               <div class="detail"><span class="k">Presets</span>
@@ -1162,7 +1164,6 @@ public, max-age=<span class="g">31536000</span>, immutable
             <div class="t-ln doctor"><span class="t-dim">Expiration:</span> <span class="t-ok-cyan">300s</span></div>
             <div class="t-ln doctor"><span class="t-dim">Masking:</span> disabled</div>
             <div class="t-ln doctor"><span class="t-dim">Obfuscation:</span> disabled</div>
-            <div class="t-ln doctor"><span class="t-dim">&nbsp;&nbsp;. engine:</span> not found</div>
             <div class="t-ln doctor"><span class="t-dim">Source Maps:</span> no</div>
             <div class="t-ln doctor"><span class="t-dim">Driver:</span> public</div>
           </div>
@@ -1225,6 +1226,11 @@ public, max-age=<span class="g">31536000</span>, immutable
               <div><b>Production deployment</b><p>Nginx rules, CDN offload, release checklist.</p></div>
             </a>
           </div>
+          <p style="margin-top:1.2rem;font-size:.9rem;opacity:.75">
+            <b>Removal:</b> <code>composer remove shamimstack/asset-shield</code> +
+            <code>npm uninstall --save-dev @asset-shield/vite-plugin</code> — full cleanup steps in the
+            <a href="installation.html">Installation guide</a>.
+          </p>
         </div>
       </div>
     </div>
@@ -1294,7 +1300,7 @@ public, max-age=<span class="g">31536000</span>, immutable
       </div>
     </div>
     <div class="foot-bottom">
-      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span class="t-ok">shamimstack/asset-shield</span> &middot; npm <span class="t-ok-cyan">@asset-shield/vite-plugin</span></p>
+      <p>v0.2.0 &middot; MIT License &middot; Composer <span class="t-ok">shamimstack/asset-shield</span> &middot; npm <span class="t-ok-cyan">@asset-shield/vite-plugin</span></p>
       <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
         exposure, protects asset access, and increases the cost of reverse engineering.</p>
     </div>
@@ -1420,7 +1426,7 @@ public, max-age=<span class="g">31536000</span>, immutable
       nameless: ['3aefc826.js', '8d668308.js', '0da9d996.css', '0a954815.js', '0ca54b65.js'],
       codename: ['onyx-tapir.js', 'ivory-cougar.js', 'emerald-tapir.css', 'violet-condor.js', 'velvet-falcon.js']
     };
-    var OPAQUE = ['7f92a8c1', 'c21b7e66', '4db7e910', '9f04d2ab', 'a38f2c6d'];
+    var OPAQUE = ['as_2ae34e8b0c462491', 'as_1ca9f81d2c6de43b', 'as_8e5a3b097c42d1f6', 'as_7bc04d9a1e6f8235', 'as_9d2f6c18a4e7b305'];
     var VITE_BEFORE = [
       ['/build/assets/app-A91Kx.js', 'app entry'],
       ['/build/assets/chunk-V4qTz3.js', 'chunk'],
@@ -1434,7 +1440,7 @@ public, max-age=<span class="g">31536000</span>, immutable
       ['/package-lock.json', '200 — lockfile'],
       ['/assets/script.php', '200 — executed'],
       ['/assets/example.cs', '200 — source'],
-      ['/assets/7f92a8c1.js', '200 — guessable id']
+      ['/assets/as_2ae34e8b0c462491.js', '200 — guessable id']
     ];
     var EXPOSE_AFTER = [
       ['/.env', '403 — denied'],
@@ -1442,7 +1448,7 @@ public, max-age=<span class="g">31536000</span>, immutable
       ['/package-lock.json', '403 — denied'],
       ['/assets/script.php', '403 — denied'],
       ['/assets/example.cs', '403 — denied'],
-      ['/assets/7f92a8c1.js', '404 — unknown id']
+      ['/assets/as_2ae34e8b0c462491.js', '404 — unknown id']
     ];
     var OBS_BEFORE = 'export class PaymentEngine {\n' +
       '  #apiKey = "pk_live_920fa3894";\n' +

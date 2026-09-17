@@ -34,7 +34,7 @@ honestly and securely.
       └──► AssetUrlGenerator  │   AssetController (GET /assets/{opaque})
              (opaque URLs)    │          │
              Signer (HMAC)    │          ▼
-                          regional delivery drivers (Public / Stream)
+                          pluggable delivery drivers (Public / Stream)
 ```
 
 1. The **Vite plugin** produces the build and writes the registry.
@@ -46,7 +46,7 @@ honestly and securely.
 
 - Source trees (`resources/`, `app/`, `routes/`, `vendor/`, `node_modules/`, `.env`) stay outside
   the client-visible surface.
-- Protected URLs look like `/assets/7f92a8c1`, never `/build/assets/app-A91Kx.js`.
+- Protected URLs look like `/assets/as_2ae34e8b0c462491`, never `/build/assets/app-A91Kx.js`.
 - Signed URLs can expire; invalid or expired signatures return **403**.
 - Standard Laravel Vite behavior (`@vite()`) is untouched.
 - Obfuscation and source maps are **disabled by default**, vendor chunks are **never obfuscated by
@@ -62,7 +62,7 @@ honestly and securely.
 
 ## License & status
 
-- Version: 0.1.0 (MVP)
+- Version: 0.2.0
 - [CHANGELOG](../CHANGELOG.md)
 - [PRD](./PRD.md) · [TRD](./TRD.md)
 

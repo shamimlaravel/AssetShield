@@ -96,23 +96,24 @@ predictable and diffable. Turn them on per environment:
 ```php
 // config/asset-shield.php
 'mask' => [
-    'enabled'  => true,
-    'strategy' => 'codename',  // preserve | nameless | codename
-    'seed'     => env('ASSET_SHIELD_SEED', 'a-long-secret-phrase'),
-],
+        'enabled'  => true,
+        'strategy' => 'codename',  // preserve | nameless | codename
+        'seed'     => env('ASSET_SHIELD_MASK_SEED', 'a-long-secret-phrase'),
+    ],
 'obfuscation' => [
     'enabled' => true,
     'preset'  => 'balanced',   // light | balanced | aggressive
 ],
 ```
 
-Masked and obfuscated output is derived deterministically from your `ASSET_SHIELD_SEED`: keep it
-stable or every deploy renames every file (and breaks client caches). Obfuscation runs through Node
-during `vite build` and stays inert while `vite dev` serves readable source. Only the server ever
-reads the legend that maps names back.
+Masked and obfuscated output is derived deterministically from your `ASSET_SHIELD_MASK_SEED` (and
+`APP_KEY`): keep them stable or every deploy renames every file (and breaks client caches).
+Obfuscation runs natively through the Vite plugin during `vite build` and stays inert while
+`vite dev` serves readable source. Only the server ever reads the legend that maps names back.
 
 See [configuration.md](configuration.md) for aliases, include/exclude lists, the Vite-plugin options,
-and the caching rules. Masking is always disabled outside `production`.
+and the caching rules. There is no automatic environment gating — masking and obfuscation follow
+their config flags, which are off by default.
 
 ## 7. Verify
 
@@ -135,7 +136,6 @@ AssetShield
   Expiration:         300s
   Masking:            disabled
   Obfuscation:        disabled
-    . engine:         not found
   Source Maps:        no
   Driver:             public
 ```
@@ -144,13 +144,35 @@ You can now open the page, view source, and confirm scripts load from
 `/assets/{opaque-id}` instead of `/build/assets/app-<hash>.js`.
 
 Once you complete step 6, the status output replaces those `disabled` lines with the live values —
-`Masking:  codename` and `Obfuscation:  balanced (engine found)`.
+`Masking:  codename` and `Obfuscation:  balanced`.
 
 ## What was NOT installed
 
 - No database tables — the registry is a build artifact.
 - No full Laravel framework dependency — only `illuminate/*` packages are used.
 - No dev-server changes — `vite dev` keeps behaving normally.
+
+## Uninstall
+
+Removal is a Composer/npm-level operation — there is **no** artisan uninstall command.
+
+```bash
+composer remove shamimstack/asset-shield     # unregisters the provider (auto-discovery)
+npm uninstall --save-dev @asset-shield/vite-plugin
+```
+
+Composer and npm only remove the packages. Everything installation published or created stays on
+disk and must be cleaned up manually:
+
+1. Delete the published config — `config/asset-shield.php` (or revert it from version control).
+2. Remove `assetShieldVite()` from `vite.config.js` / `vite.config.ts`.
+3. Revert `@shieldVite([...])` to `@vite([...])` in Blade and delete any `@assetShield`,
+   `@assetShieldJs`, `@assetShieldCss` directives.
+4. Delete the build artifacts under `storage/app/asset-shield/` (`registry.json`, `legend.json`).
+   They are regenerated on the next build and are not needed once the package is gone.
+
+Nothing else is touched: no database tables, no runtime-mutated `public/` files beyond the normal
+`build` output.
 
 ## Next steps
 

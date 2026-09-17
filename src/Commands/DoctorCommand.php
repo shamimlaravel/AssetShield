@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Commands;
 
 use Illuminate\Console\Command;
@@ -8,17 +10,19 @@ use Shamimstack\AssetShield\AssetManifest;
 use Shamimstack\AssetShield\AssetRegistry;
 use Shamimstack\AssetShield\Masking\MaskPlanner;
 use Shamimstack\AssetShield\Masking\Legend;
-use Shamimstack\AssetShield\Obfuscation\ObfuscationEngine;
 
+/**
+ * @phpstan-type DoctorRow = array{state: 'ok'|'info'|'warn'|'fail', label: string, detail: string}
+ */
 class DoctorCommand extends Command
 {
     protected $signature = 'asset-shield:doctor {--json : Output the checks as JSON}';
 
     protected $description = 'Inspect the deployment for AssetShield security and configuration problems';
 
-    public function handle(AssetManifest $manifest, AssetRegistry $registry, Legend $legend, ObfuscationEngine $engine): int
+    public function handle(AssetManifest $manifest, AssetRegistry $registry, Legend $legend): int
     {
-        $checks = $this->checks($manifest, $registry, $legend, $engine);
+        $checks = $this->checks($manifest, $registry, $legend);
         $failures = 0;
         $warnings = 0;
 
@@ -66,9 +70,9 @@ class DoctorCommand extends Command
     }
 
     /**
-     * @return array<int,array{state:'ok'|'warn'|'fail',label:string,detail:string}>
+     * @return array<int, DoctorRow>
      */
-    private function checks(AssetManifest $manifest, AssetRegistry $registry, Legend $legend, ObfuscationEngine $engine): array
+    private function checks(AssetManifest $manifest, AssetRegistry $registry, Legend $legend): array
     {
         $config = config('asset-shield');
         $environment = (string) config('app.env');
@@ -157,14 +161,7 @@ class DoctorCommand extends Command
             if (! $legend->exists()) {
                 $checks[] = $this->row('warn', 'Masking enabled but legend missing', $legend->path().' — run "npm run build" with the @asset-shield/vite-plugin first.');
             } else {
-                $planner = new MaskPlanner([
-                    'enabled' => true,
-                    'strategy' => (string) ($mask['strategy'] ?? 'nameless'),
-                    'seed' => (string) ($mask['seed'] ?? ''),
-                    'aliases' => (array) ($mask['aliases'] ?? []),
-                    'include' => (array) ($mask['include'] ?? []),
-                    'exclude' => (array) ($mask['exclude'] ?? []),
-                ]);
+                $planner = MaskPlanner::fromConfig($mask);
 
                 $mismatches = [];
 
@@ -254,13 +251,12 @@ class DoctorCommand extends Command
         $checks[] = $this->row('info', 'Laravel', app()->version());
         $checks[] = $this->viteVersionCheck();
 
-        // 13. Obfuscation engine availability (only meaningful when enabled)
+        // 13. Obfuscation configuration (config mirror — the engine itself
+        //     stays native to the @asset-shield/vite-plugin build side)
         $obfuscation = (array) ($config['obfuscation'] ?? []);
 
         if ((bool) ($obfuscation['enabled'] ?? false)) {
-            $checks[] = $engine->isAvailable()
-                ? $this->row('ok', 'Obfuscation engine available', 'javascript-obfuscator found by the adapter.')
-                : $this->row('fail', 'Obfuscation engine missing', 'javascript-obfuscator is not installed/available for the configured adapter.');
+            $checks[] = $this->row('info', 'Obfuscation enabled', 'preset: '.($obfuscation['preset'] ?? 'balanced').' (applied by the Vite plugin at build time).');
         } else {
             $checks[] = $this->row('info', 'Obfuscation disabled', '');
         }
@@ -268,6 +264,9 @@ class DoctorCommand extends Command
         return $checks;
     }
 
+    /**
+     * @return DoctorRow
+     */
     private function versionCheck(string $label, string $bin, string $arg): array
     {
         $command = str_contains(strtolower(PHP_OS_FAMILY), 'win')
@@ -302,6 +301,8 @@ class DoctorCommand extends Command
      * Vite lives in node_modules, not on PATH, so resolve it from the project
      * root. Falls back to the bundled manifest version when the binary is not
      * executable but the package is present.
+     *
+     * @return DoctorRow
      */
     private function viteVersionCheck(): array
     {
@@ -335,6 +336,9 @@ class DoctorCommand extends Command
         return $this->row('info', 'Vite unavailable', 'Could not locate vite in node_modules — frontend builds are expected to use Vite.');
     }
 
+    /**
+     * @return DoctorRow
+     */
     private function envLocationCheck(string $path, string $label): array
     {
         if (is_file($path) || is_dir($path)) {
@@ -344,6 +348,9 @@ class DoctorCommand extends Command
         return $this->row('ok', $label.' not present', '');
     }
 
+    /**
+     * @return DoctorRow
+     */
     private function vendorCheck(): array
     {
         $publicVendor = public_path('vendor');
@@ -355,6 +362,9 @@ class DoctorCommand extends Command
         return $this->row('ok', 'vendor is outside public root', '');
     }
 
+    /**
+     * @return list<string>
+     */
     private function sourceMapFiles(AssetManifest $manifest): array
     {
         if (! $manifest->exists()) {
@@ -372,6 +382,10 @@ class DoctorCommand extends Command
         return $files;
     }
 
+    /**
+     * @param  'ok'|'info'|'warn'|'fail'  $state
+     * @return DoctorRow
+     */
     private function row(string $state, string $label, string $detail): array
     {
         return ['state' => $state, 'label' => $label, 'detail' => $detail];

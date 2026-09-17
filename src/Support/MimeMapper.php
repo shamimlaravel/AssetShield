@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Support;
 
 /**
@@ -55,13 +57,13 @@ final class MimeMapper
      */
     public static function forPath(string $relativePath): ?string
     {
-        if (self::isForbidden($relativePath)) {
+        $parts = self::parts($relativePath);
+
+        if (self::isForbiddenParts($parts)) {
             return null;
         }
 
-        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-
-        return self::MAP[$extension] ?? null;
+        return self::MAP[$parts['extension']] ?? null;
     }
 
     /**
@@ -73,16 +75,36 @@ final class MimeMapper
      */
     public static function isForbidden(string $relativePath): bool
     {
-        $normalized = str_replace('\\', '/', $relativePath);
-        $basename = strtolower(basename($normalized));
+        return self::isForbiddenParts(self::parts($relativePath));
+    }
 
-        if (in_array($basename, ['env', '.env', '.gitignore', 'composer.json', 'composer.lock', 'package.json', 'package-lock.json', 'phpunit.xml', 'readme.md', 'license'], true)) {
+    /**
+     * @param  array{normalized:string, basename:string, extension:string}  $parts
+     */
+    private static function isForbiddenParts(array $parts): bool
+    {
+        if (in_array($parts['basename'], ['env', '.env', '.gitignore', 'composer.json', 'composer.lock', 'package.json', 'package-lock.json', 'phpunit.xml', 'readme.md', 'license'], true)) {
             return true;
         }
 
-        $extension = strtolower(pathinfo($normalized, PATHINFO_EXTENSION));
+        return in_array($parts['extension'], self::FORBIDDEN_EXTENSIONS, true);
+    }
 
-        return in_array($extension, self::FORBIDDEN_EXTENSIONS, true);
+    /**
+     * Single-pass decomposition: normalized path, lowercase basename and
+     * lowercase extension for one shared scan instead of three.
+     *
+     * @return array{normalized:string, basename:string, extension:string}
+     */
+    private static function parts(string $path): array
+    {
+        $normalized = str_replace('\\', '/', $path);
+
+        return [
+            'normalized' => $normalized,
+            'basename' => strtolower((string) basename($normalized)),
+            'extension' => strtolower((string) pathinfo($normalized, PATHINFO_EXTENSION)),
+        ];
     }
 
     /**
@@ -91,7 +113,7 @@ final class MimeMapper
      */
     public static function family(string $relativePath): string
     {
-        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+        $extension = self::parts($relativePath)['extension'];
 
         return match (true) {
             in_array($extension, ['css'], true) => 'style',

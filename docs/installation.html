@@ -229,7 +229,7 @@
       <a href="index.html#commands">Commands</a>
     </nav>
     <div style="display:flex;align-items:center;gap:.9rem">
-      <span class="version-pill">v0.1.0 MVP</span>
+      <span class="version-pill">v0.2.0</span>
       <a class="nav-cta" href="index.html#install">Install</a>
       <button type="button" class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-overlay">
         <span></span><span></span><span></span>
@@ -356,14 +356,14 @@ php artisan asset-shield:build</div>
 'mask' => [
     <span class="c">'enabled'</span>  => <span class="g">true</span>,
     <span class="c">'strategy'</span> => <span class="c">'codename'</span>,  <span class="d">// preserve | nameless | codename</span>
-    <span class="c">'seed'</span>     => env(<span class="c">'ASSET_SHIELD_SEED'</span>, <span class="c">'a-long-secret-phrase'</span>),
+    <span class="c">'seed'</span>     => env(<span class="c">'ASSET_SHIELD_MASK_SEED'</span>, <span class="c">'a-long-secret-phrase'</span>),
 ],
 'obfuscation' => [
     <span class="c">'enabled'</span> => <span class="g">true</span>,
     <span class="c">'preset'</span>  => <span class="c">'balanced'</span>,   <span class="d">// light | balanced | aggressive</span>
 ],</div>
           <p>Masked and obfuscated output is derived deterministically from your
-            <code>ASSET_SHIELD_SEED</code>: keep it stable or every deploy renames every file
+            <code>ASSET_SHIELD_MASK_SEED</code>: keep it stable or every deploy renames every file
             (and breaks client caches). Obfuscation runs through Node during <code>vite build</code>
             and stays inert while <code>vite dev</code> serves readable source. Only the server ever
             reads the legend that maps names back.</p>
@@ -391,14 +391,13 @@ php artisan asset-shield:build</div>
   Expiration:         300s
   Masking:            <span class="d">disabled</span>
   Obfuscation:        <span class="d">disabled</span>
-    . engine:         <span class="d">not found</span>
   Source Maps:        no
   Driver:             public</div>
           <p>You can now open the page, view source, and confirm scripts load from
             <code>/assets/{opaque-id}</code> instead of <code>/build/assets/app-&lt;hash&gt;.js</code>.</p>
           <p>Once you complete step 6, the status output replaces those <code>disabled</code> lines
             with the live values — <code class="mono">Masking: codename</code> and
-            <code class="mono">Obfuscation: balanced (engine found)</code>.</p>
+            <code class="mono">Obfuscation: balanced</code>.</p>
         </div>
       </div>
 
@@ -414,6 +413,32 @@ php artisan asset-shield:build</div>
         <li>No full Laravel framework dependency — only <code>illuminate/*</code> packages are used.</li>
         <li>No dev-server changes — <code>vite dev</code> keeps behaving normally.</li>
       </ul>
+    </div>
+  </section>
+
+  <!-- ============ UNINSTALL ============ -->
+  <section class="not-installed">
+    <div class="wrap">
+      <h2 class="reveal">Uninstall</h2>
+      <p class="reveal">Removal is a Composer/npm-level operation — there is <b>no</b> artisan
+        uninstall command.</p>
+      <div class="code">composer remove shamimstack/asset-shield     <span class="d"># unregisters the provider (auto-discovery)</span>
+npm uninstall --save-dev @asset-shield/vite-plugin</div>
+      <p class="reveal">Composer and npm only remove the packages. Everything installation published
+        or created stays on disk and must be cleaned up manually:</p>
+      <ul class="reveal">
+        <li>Delete the published config — <code>config/asset-shield.php</code> (or revert it from version
+          control).</li>
+        <li>Remove <code>assetShieldVite()</code> from <code>vite.config.js</code> /
+          <code>vite.config.ts</code>.</li>
+        <li>Revert <code>@shieldVite([...])</code> to <code>@vite([...])</code> in Blade and delete any
+          <code>@assetShield</code>, <code>@assetShieldJs</code>, <code>@assetShieldCss</code> directives.</li>
+        <li>Delete the build artifacts under <code>storage/app/asset-shield/</code>
+          (<code>registry.json</code>, <code>legend.json</code>). They are regenerated on the next build
+          and are not needed once the package is gone.</li>
+      </ul>
+      <p class="reveal">Nothing else is touched: no database tables, no runtime-mutated
+        <code>public/</code> files beyond the normal <code>build</code> output.</p>
     </div>
   </section>
 
@@ -489,7 +514,7 @@ php artisan asset-shield:build</div>
       </div>
     </div>
     <div class="foot-bottom">
-      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
+      <p>v0.2.0 &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
       <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
         exposure, protects asset access, and increases the cost of reverse engineering.</p>
     </div>

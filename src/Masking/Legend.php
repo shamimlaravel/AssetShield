@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Masking;
 
 /**
@@ -18,6 +20,12 @@ namespace Shamimstack\AssetShield\Masking;
  *
  * It MUST live outside public/ (default: storage/app/asset-shield/legend.json),
  * is never routed and never served.
+ *
+ * Unlike the manifest and registry, the legend is NOT served from the Laravel
+ * cache: it is memoized per worker only, so a plugin rebuild is always picked
+ * up by the next request/process without needing a cache purge. Rebuilds of
+ * the legend are rare (only on front-end builds), so the disk read cost is
+ * negligible.
  */
 class Legend
 {
@@ -39,7 +47,7 @@ class Legend
     {
         $path = (string) $app['config']->get('asset-shield.mask.legend', 'app/asset-shield/legend.json');
 
-        if ($path === '' || preg_match('/^[A-Za-z]:[\\\\\/]|^\//', $path) !== 1) {
+        if ($path === '' || ! \Shamimstack\AssetShield\Support\Path::isAbsolute($path)) {
             $path = $app->storagePath($path);
         }
 
@@ -54,16 +62,6 @@ class Legend
     public function exists(): bool
     {
         return is_file($this->path);
-    }
-
-    /**
-     * @return array{original:string, masked:string}|null
-     */
-    public function entry(string $key): ?array
-    {
-        $this->ensureLoaded();
-
-        return $this->entries[$key] ?? null;
     }
 
     /**

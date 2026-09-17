@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Commands;
 
 use Illuminate\Console\Command;
@@ -31,6 +33,7 @@ class BuildCommand extends Command
         }
 
         $registry->refresh();
+        $manifest->refresh();
 
         $data = $manifest->data();
         $rows = $this->buildRows($manifest, $legend, $data);
@@ -56,6 +59,7 @@ class BuildCommand extends Command
         }
 
         $this->reportMasking($manifest, $legend, $data);
+        $this->reportSourceMaps($manifest, $data);
 
         $count = $registry->save();
         $this->components->info(sprintf('Registered %d %s in "%s".', $count, $count === 1 ? 'asset' : 'assets', $registry->path()));
@@ -69,6 +73,7 @@ class BuildCommand extends Command
      * plugin legend is present its pre-mask names are preserved as
      * `original`.
      *
+     * @param  array<string, mixed>  $data
      * @return array<int,array{logical:string,file:string,type:string,integrity:?string,original:?string}>
      */
     private function buildRows(AssetManifest $manifest, Legend $legend, array $data): array
@@ -111,6 +116,8 @@ class BuildCommand extends Command
      * Cross-check the plugin legend against the manifest and print a summary of
      * which assets were masked (and a warning when mask is configured but
      * no legend was produced by the plugin).
+     *
+     * @param  array<string, mixed>  $data
      */
     private function reportMasking(AssetManifest $manifest, Legend $legend, array $data): void
     {
@@ -126,14 +133,7 @@ class BuildCommand extends Command
             return;
         }
 
-        $planner = new MaskPlanner([
-            'enabled' => true,
-            'strategy' => (string) ($config['strategy'] ?? 'nameless'),
-            'seed' => (string) ($config['seed'] ?? ''),
-            'aliases' => (array) ($config['aliases'] ?? []),
-            'include' => (array) ($config['include'] ?? []),
-            'exclude' => (array) ($config['exclude'] ?? []),
-        ]);
+        $planner = MaskPlanner::fromConfig($config);
 
         $renamed = 0;
         $mismatches = 0;
@@ -167,6 +167,31 @@ class BuildCommand extends Command
         }
 
         $this->components->info(sprintf('Masking legend validated: %d asset%s renamed (strategy: %s).', $renamed, $renamed === 1 ? ' was' : 's were', (string) ($config['strategy'] ?? 'nameless')));
+    }
+
+    /**
+     * Warn when source maps are enabled or present in the manifest output.
+     * Hosted source maps are never hidden: they must be removed before deploy.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function reportSourceMaps(AssetManifest $manifest, array $data): void
+    {
+        if ((bool) config('asset-shield.build.source_maps', false)) {
+            $this->components->warn('asset-shield.build.source_maps is enabled. Hosted source maps are never hidden by AssetShield — disable them for production builds.');
+        }
+
+        $mapFiles = [];
+
+        foreach ($data as $record) {
+            if (is_array($record) && isset($record['file']) && is_string($record['file']) && str_ends_with($record['file'], '.map')) {
+                $mapFiles[] = $record['file'];
+            }
+        }
+
+        if ($mapFiles !== []) {
+            $this->components->warn('Source map files are present in the manifest ('.implode(', ', array_slice($mapFiles, 0, 5)).'). They are never served, but consider removing them before deploying.');
+        }
     }
 
     private function runFrontendBuild(): void

@@ -14,7 +14,7 @@ reverse engineering.
 | Capability | Result |
 |---|---|
 | Source outside web root | `resources/`, `app/`, `routes/`, `vendor/`, `node_modules/`, `.env` never public |
-| Opaque asset URLs | `/assets/7f92a8c1` instead of `/build/assets/app-A91Kx.js` |
+| Opaque asset URLs | `/assets/as_2ae34e8b0c462491` instead of `/build/assets/app-A91Kx.js` |
 | Signed, expiring URLs | HMAC-SHA256, constant-time verify, `expires`, forged/expired → **403** |
 | Registry-only resolution | Arbitrary file paths are structurally impossible to request |
 | Cache + security headers | `immutable` caching, correct MIME, `nosniff`, no wildcard CORS |
@@ -44,6 +44,11 @@ npm install --save-dev @asset-shield/vite-plugin
 php artisan asset-shield:install      # publish config, create paths, show Vite setup
 ```
 
+**Zero-config by default**: install, add the plugin, and `AssetShield::script()/style()` work out of the box.
+Everything is off unless you turn it on — masking, obfuscation, protected runtime delivery, CSP — and
+the defaults match across the PHP side and the Vite plugin (seeds, legend path, output dir), so a fresh
+install "just works" without synchronising anything.
+
 Add the plugin to `vite.config.js`:
 
 ```js
@@ -65,6 +70,19 @@ php artisan asset-shield:build        # validate manifest, write registry
 php artisan asset-shield:status
 ```
 
+### Uninstall
+
+```bash
+composer remove shamimstack/asset-shield     # unregisters the provider (auto-discovery)
+npm uninstall --save-dev @asset-shield/vite-plugin
+```
+
+Composer and npm only remove the packages. Then, manually: delete the published
+`config/asset-shield.php`, remove `assetShieldVite()` from your `vite.config`, revert
+`@shieldVite(...)` to `@vite(...)` in Blade (and drop any `@assetShield*` directives), and delete
+`storage/app/asset-shield/` (registry + legend build artifacts). There is no artisan uninstall
+command.
+
 ## Usage
 
 ```blade
@@ -74,7 +92,7 @@ php artisan asset-shield:status
 @assetShield('resources/js/app.js')
 
 {{-- Or the PHP API --}}
-{!! AssetShield::script('resources/js/app.js') !!}   {{-- <script src="/assets/7f92a8c1?..."></script> --}}
+{!! AssetShield::script('resources/js/app.js') !!}   {{-- <script src="/assets/as_2ae34e8b0c462491?..."></script> --}}
 {!! AssetShield::style('resources/css/app.css') !!}  {{-- <link rel="stylesheet" href="/assets/..."> --}}
 AssetShield::url('resources/js/app.js', signed: true, expires: now()->addMinutes(10));
 
@@ -92,14 +110,14 @@ See [docs/configuration.md](docs/configuration.md) for the full reference. Highl
 'build'      => [
     'out_dir'     => 'build',
     'manifest'    => 'public/build/manifest.json',
-    'registry'    => 'storage/app/asset-shield/registry.json',
+    'registry'    => 'app/asset-shield/registry.json',
     'source_maps' => false,
 ],
 'mask' => ['enabled' => false, 'strategy' => 'preserve', 'seed' => '', 'legend' => 'app/asset-shield/legend.json'],
-'obfuscation'=> ['enabled' => false, 'preset' => 'balanced', 'engine' => 'javascript-obfuscator', 'exclude_vendor' => true],
+'obfuscation'=> ['enabled' => false, 'preset' => 'balanced', 'exclude_vendor' => true],
 'runtime'    => ['enabled' => false, 'route_prefix' => 'assets', 'signed_urls' => true, 'expires' => 300],
 'delivery'   => ['driver' => 'public'],
-'cache'      => ['enabled' => true, 'max_age' => 31536000],
+'cache'      => ['enabled' => env('ASSET_SHIELD_CACHE', true), 'max_age' => env('ASSET_SHIELD_CACHE_MAX_AGE', 31536000)],
 'security'   => ['csp' => false, 'allowlist' => ['script' => [], 'style' => [], 'img' => []]],
 ```
 
@@ -158,6 +176,6 @@ must stay outside `public/`; `APP_DEBUG=false`; immutable IDs + cache headers me
 
 ## License & status
 
-- **Version:** 0.1.0 (MVP) · [CHANGELOG](CHANGELOG.md)
+- **Version:** 0.2.0 · [CHANGELOG](CHANGELOG.md)
 - **License:** MIT (see [LICENSE](LICENSE))
 - Composer package: `shamimstack/asset-shield` · Vite plugin: `@asset-shield/vite-plugin`

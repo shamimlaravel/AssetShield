@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Shamimstack\AssetShield\Exceptions;
 
 use RuntimeException;
@@ -8,7 +10,7 @@ use RuntimeException;
  * Thrown when a logical asset entry cannot be resolved against the Vite
  * manifest or the protected registry.
  */
-class AssetNotFoundException extends RuntimeException
+final class AssetNotFoundException extends RuntimeException
 {
     public static function fromManifest(string $entry, string $manifestPath): self
     {

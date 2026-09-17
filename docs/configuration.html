@@ -215,7 +215,7 @@
       <a href="index.html#commands">Commands</a>
     </nav>
     <div style="display:flex;align-items:center;gap:.9rem">
-      <span class="version-pill">v0.1.0 MVP</span>
+      <span class="version-pill">v0.2.0</span>
       <a class="nav-cta" href="index.html#install">Install</a>
       <button type="button" class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-overlay">
         <span></span><span></span><span></span>
@@ -284,7 +284,7 @@
     <span class="d">'build'</span> =&gt; [
         <span class="d">'out_dir'</span>     =&gt; env(<span class="c">'ASSET_SHIELD_BUILD_OUT_DIR'</span>, <span class="c">'build'</span>),
         <span class="d">'manifest'</span>    =&gt; env(<span class="c">'ASSET_SHIELD_MANIFEST_PATH'</span>, <span class="c">'public/build/manifest.json'</span>),
-        <span class="d">'registry'</span>    =&gt; env(<span class="c">'ASSET_SHIELD_REGISTRY_PATH'</span>, <span class="c">'storage/app/asset-shield/registry.json'</span>),
+        <span class="d">'registry'</span>    =&gt; env(<span class="c">'ASSET_SHIELD_REGISTRY_PATH'</span>, <span class="c">'app/asset-shield/registry.json'</span>),
         <span class="d">'source_maps'</span> =&gt; env(<span class="c">'ASSET_SHIELD_SOURCE_MAPS'</span>, <span class="g">false</span>),
     ],
 
@@ -306,24 +306,18 @@
         <span class="d">'aliases'</span>    =&gt; [],
         <span class="d">'include'</span>    =&gt; [],
         <span class="d">'exclude'</span>    =&gt; [],
-        <span class="d">'dictionary'</span> =&gt; env(<span class="c">'ASSET_SHIELD_MASK_DICTIONARY'</span>, <span class="c">'default'</span>),
         <span class="d">'legend'</span>     =&gt; env(<span class="c">'ASSET_SHIELD_LEGEND_PATH'</span>, <span class="c">'app/asset-shield/legend.json'</span>),
     ],
 
     <span class="d">/*
-    | Obfuscation (mirrored from the plugin; informational on the PHP side).
+    | Obfuscation (mirrored from the plugin; native there via javascript-obfuscator).
     | OPT-OUT-SAFE: disabled by default. Obfuscation is NOT encryption.
     |   exclude_vendor  node_modules chunks skipped on the plugin side.
-    |   node_binary / package_path  overrides for the PHP-side adapter.
     */</span>
     <span class="d">'obfuscation'</span> =&gt; [
         <span class="d">'enabled'</span>        =&gt; env(<span class="c">'ASSET_SHIELD_OBFUSCATION'</span>, <span class="g">false</span>),
         <span class="d">'preset'</span>         =&gt; env(<span class="c">'ASSET_SHIELD_OBFUSCATION_PRESET'</span>, <span class="c">'balanced'</span>),
-        <span class="d">'engine'</span>         =&gt; env(<span class="c">'ASSET_SHIELD_OBFUSCATION_ENGINE'</span>, <span class="c">'javascript-obfuscator'</span>),
         <span class="d">'exclude_vendor'</span> =&gt; env(<span class="c">'ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR'</span>, <span class="g">true</span>),
-        <span class="d">'node_binary'</span>    =&gt; env(<span class="c">'ASSET_SHIELD_OBFUSCATION_NODE'</span>, <span class="c">'node'</span>),
-        <span class="d">'package_path'</span>   =&gt; env(<span class="c">'ASSET_SHIELD_OBFUSCATION_PACKAGE'</span>, <span class="c">''</span>),
-        <span class="d">'timeout'</span>        =&gt; (float) env(<span class="c">'ASSET_SHIELD_OBFUSCATION_TIMEOUT'</span>, 120.0),
     ],
 
     <span class="d">/*
@@ -348,11 +342,12 @@
     ],
 
     <span class="d">/*
-    | HTTP caching for immutable production assets. For signed assets the
-    | max-age is clamped to the signature lifetime.
+    | HTTP caching for immutable production assets. In production the same
+    | switch warms the decoded manifest/registry payloads through the Laravel
+    | cache. For signed assets the max-age is clamped to the signature lifetime.
     */</span>
     <span class="d">'cache'</span> =&gt; [
-        <span class="d">'enabled'</span> =&gt; <span class="g">true</span>,
+        <span class="d">'enabled'</span> =&gt; env(<span class="c">'ASSET_SHIELD_CACHE'</span>, <span class="g">true</span>),
         <span class="d">'max_age'</span> =&gt; env(<span class="c">'ASSET_SHIELD_CACHE_MAX_AGE'</span>, 31536000),
     ],
 
@@ -396,24 +391,21 @@
             <tr><td class="env">ASSET_SHIELD_ENV</td><td class="val">APP_ENV</td><td>Build target environment</td></tr>
             <tr><td class="env">ASSET_SHIELD_BUILD_OUT_DIR</td><td class="val">build</td><td>Public-relative Vite output dir</td></tr>
             <tr><td class="env">ASSET_SHIELD_MANIFEST_PATH</td><td class="val">public/build/manifest.json</td><td>Vite manifest</td></tr>
-            <tr><td class="env">ASSET_SHIELD_REGISTRY_PATH</td><td class="val">storage/app/asset-shield/registry.json</td><td>Registry (server-owned)</td></tr>
+            <tr><td class="env">ASSET_SHIELD_REGISTRY_PATH</td><td class="val">app/asset-shield/registry.json</td><td>Registry (server-owned; resolved under storage)</td></tr>
             <tr><td class="env">ASSET_SHIELD_SOURCE_MAPS</td><td class="val">false</td><td>Whether source maps are built (never hidden)</td></tr>
             <tr><td class="env">ASSET_SHIELD_MASK</td><td class="val">false</td><td>Enable masking</td></tr>
             <tr><td class="env">ASSET_SHIELD_MASK_STRATEGY</td><td class="val">preserve</td><td><code>preserve</code> | <code>nameless</code> | <code>codename</code></td></tr>
             <tr><td class="env">ASSET_SHIELD_MASK_SEED</td><td class="val">''</td><td>Name seed — must match the plugin</td></tr>
-            <tr><td class="env">ASSET_SHIELD_MASK_DICTIONARY</td><td class="val">default</td><td>Codename wordlist theme</td></tr>
             <tr><td class="env">ASSET_SHIELD_LEGEND_PATH</td><td class="val">app/asset-shield/legend.json</td><td>Secret masking legend (storagePath-relative)</td></tr>
             <tr><td class="env">ASSET_SHIELD_OBFUSCATION</td><td class="val">false</td><td>Enable obfuscation (mirrored in plugin)</td></tr>
             <tr><td class="env">ASSET_SHIELD_OBFUSCATION_PRESET</td><td class="val">balanced</td><td><code>light</code> | <code>balanced</code> | <code>aggressive</code></td></tr>
-            <tr><td class="env">ASSET_SHIELD_OBFUSCATION_ENGINE</td><td class="val">javascript-obfuscator</td><td>Engine name</td></tr>
             <tr><td class="env">ASSET_SHIELD_OBFUSCATION_EXCLUDE_VENDOR</td><td class="val">true</td><td>Skip <code>node_modules</code> chunks</td></tr>
-            <tr><td class="env">ASSET_SHIELD_OBFUSCATION_NODE</td><td class="val">node</td><td>Node binary for the PHP adapter</td></tr>
-            <tr><td class="env">ASSET_SHIELD_OBFUSCATION_PACKAGE</td><td class="val">''</td><td>Override package entry path</td></tr>
             <tr><td class="env">ASSET_SHIELD_RUNTIME</td><td class="val">false</td><td>Protected runtime delivery (opt-in)</td></tr>
             <tr><td class="env">ASSET_SHIELD_ROUTE_PREFIX</td><td class="val">assets</td><td>Protected route prefix</td></tr>
             <tr><td class="env">ASSET_SHIELD_SIGNED_URLS</td><td class="val">true</td><td>HMAC-sign protected URLs</td></tr>
             <tr><td class="env">ASSET_SHIELD_SIGNATURE_EXPIRES</td><td class="val">300</td><td>Default signature lifetime (seconds)</td></tr>
             <tr><td class="env">ASSET_SHIELD_DRIVER</td><td class="val">public</td><td><code>public</code> | <code>stream</code></td></tr>
+            <tr><td class="env">ASSET_SHIELD_CACHE</td><td class="val">true</td><td>Cache-Control headers + production payload cache</td></tr>
             <tr><td class="env">ASSET_SHIELD_CACHE_MAX_AGE</td><td class="val">31536000</td><td>Cache header max-age</td></tr>
             <tr><td class="env">ASSET_SHIELD_CSP</td><td class="val">false</td><td>Strict CSP on asset responses</td></tr>
           </tbody>
@@ -557,7 +549,7 @@
       </div>
     </div>
     <div class="foot-bottom">
-      <p>v0.1.0 MVP &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
+      <p>v0.2.0 &middot; MIT License &middot; Composer <span style="color:var(--accent)">shamimstack/asset-shield</span> &middot; npm <span style="color:var(--accent-2)">@asset-shield/vite-plugin</span></p>
       <p class="honest-mini">AssetShield does not make browser-delivered code impossible to inspect. It reduces
         exposure, protects asset access, and increases the cost of reverse engineering.</p>
     </div>
